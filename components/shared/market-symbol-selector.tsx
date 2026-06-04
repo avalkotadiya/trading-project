@@ -10,6 +10,7 @@ import {
   type CategoryId,
   type MarketCategory
 } from "@/lib/market-categories";
+import { UI_SYMBOL_LIMITS } from "@/lib/dhan-api-limits";
 import { cn } from "@/utils/cn";
 
 export type MarketInstrument = {
@@ -63,6 +64,29 @@ function categoryToSection(catId: string): string {
   }
 }
 
+function toDisplaySegment(exchangeSegment: string, instrument: string) {
+  if (exchangeSegment === "IDX_I") return "INDEX";
+  if (
+    exchangeSegment === "NSE_FNO" ||
+    exchangeSegment === "BSE_FNO" ||
+    exchangeSegment === "NSE_CURRENCY" ||
+    exchangeSegment === "BSE_CURRENCY" ||
+    exchangeSegment === "MCX_COMM" ||
+    instrument.startsWith("FUT") ||
+    instrument.startsWith("OPT")
+  ) {
+    return "FNO";
+  }
+  return "EQ";
+}
+
+function normalizeInstrument(row: MarketInstrument): MarketInstrument {
+  return {
+    ...row,
+    segment: row.segment ?? toDisplaySegment(row.exchangeSegment, row.instrument)
+  };
+}
+
 async function fetchBySegment(
   cat: MarketCategory,
   q: string,
@@ -71,7 +95,7 @@ async function fetchBySegment(
 ): Promise<MarketInstrument[]> {
   // Primary path: hit the central registry API. India-only by construction.
   const section = categoryToSection(cat.id);
-  const params = new URLSearchParams({ section, limit: "80" });
+  const params = new URLSearchParams({ section, limit: String(UI_SYMBOL_LIMITS.symbolPickerResults) });
   if (q) params.set("q", q);
   // The registry doesn't yet support multi-segment OR, so we narrow to the
   // first effective segment if the category targets multiple (e.g. F&O on
@@ -79,7 +103,7 @@ async function fetchBySegment(
   if (effectiveSegments.length === 1) params.set("segment", effectiveSegments[0]);
 
   try {
-    const res = await fetch(`/api/symbols?${params.toString()}`, { signal, cache: "no-store" });
+    const res = await fetch(`/api/symbols?${params.toString()}`, { signal });
     if (res.ok) {
       const payload = (await res.json()) as { data?: { symbols?: MarketInstrument[] } };
       const rows = payload?.data?.symbols ?? [];
@@ -87,7 +111,7 @@ async function fetchBySegment(
       const narrowed = effectiveSegments.length > 1
         ? rows.filter((r) => effectiveSegments.includes(r.exchangeSegment))
         : rows;
-      if (narrowed.length > 0) return narrowed;
+      if (narrowed.length > 0) return narrowed.map(normalizeInstrument);
     }
   } catch {
     // Fall through to the legacy endpoint below.
@@ -99,11 +123,11 @@ async function fetchBySegment(
   if (effectiveSegments.length) legacyParams.set("segments", effectiveSegments.join(","));
   if (q) legacyParams.set("q", q);
   if (cat.instrumentTypes?.length) legacyParams.set("instrument", cat.instrumentTypes[0]);
-  legacyParams.set("limit", "80");
+  legacyParams.set("limit", String(UI_SYMBOL_LIMITS.symbolPickerResults));
   const res = await fetch(`/api/dhan/instruments/by-segment?${legacyParams.toString()}`, { signal });
   if (!res.ok) return [];
   const payload = (await res.json()) as { data?: { instruments?: MarketInstrument[] } };
-  return payload?.data?.instruments ?? [];
+  return (payload?.data?.instruments ?? []).map(normalizeInstrument);
 }
 
 export function MarketSymbolSelector({
@@ -195,7 +219,7 @@ export function MarketSymbolSelector({
       <button
         type="button"
         onClick={openDropdown}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.05] px-3 text-sm transition hover:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.05] px-3 text-sm transition hover:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-sapphire-glow/30"
       >
         <span className={value ? "font-semibold text-white" : "text-slate-500"}>
           {value || placeholder}
@@ -220,7 +244,7 @@ export function MarketSymbolSelector({
                 className={cn(
                   "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                   category === cat.id
-                    ? "bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/30"
+                    ? "bg-sapphire-glow/20 text-sapphire-soft ring-1 ring-sapphire-glow/30"
                     : "text-slate-400 hover:bg-white/[0.06] hover:text-white"
                 )}
               >
@@ -238,7 +262,7 @@ export function MarketSymbolSelector({
               value={query}
               onChange={(e) => setQuery(e.target.value.toUpperCase())}
               placeholder={`Search ${activeCat.label}…`}
-              className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.04] pl-8 pr-8 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
+              className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.04] pl-8 pr-8 text-sm text-white placeholder:text-slate-500 focus:border-sapphire-glow/40 focus:outline-none focus:ring-1 focus:ring-sapphire-glow/20"
             />
             {query ? (
               <button

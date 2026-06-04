@@ -2,11 +2,12 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
+import { DHAN_MAX_LIVE_FEED_INSTRUMENTS } from "@/lib/dhan-api-limits";
 import { marketDataService } from "@/services/market-data/market-data.service";
 import { marketDataErrorResponse, requireMarketDataAccess } from "@/services/market-data/market-data.guard";
 
 const subscriptionSchema = z.object({
-  symbols: z.array(z.string().min(1).max(80)).min(1).max(200)
+  symbols: z.array(z.string().min(1).max(80)).min(1).max(DHAN_MAX_LIVE_FEED_INSTRUMENTS)
 });
 
 export async function POST(request: NextRequest) {

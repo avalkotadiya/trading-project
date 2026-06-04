@@ -33,7 +33,7 @@ export function MarketPulsePreview() {
               <div
                 key={height + index}
                 className={cn(
-                  "flex-1 origin-bottom rounded-t-sm shadow-[0_0_18px_rgba(56,232,255,0.16)] animate-[dataBarRise_700ms_ease-out_both]",
+                  "flex-1 origin-bottom rounded-t-sm shadow-[0_0_18px_rgba(59,130,246,0.16)] animate-[dataBarRise_700ms_ease-out_both]",
                   index % 4 === 1 ? "bg-trade-red/70" : "bg-cyan-glow/70"
                 )}
                 style={{ height: `${height}%`, animationDelay: `${index * 55}ms` }}
@@ -63,9 +63,9 @@ export function MarketPulsePreview() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-cyan-glow/20 bg-cyan-glow/10 p-4 shadow-[0_18px_46px_rgba(56,232,255,0.08)]">
+          <div className="rounded-lg border border-cyan-glow/20 bg-cyan-glow/10 p-4 shadow-[0_18px_46px_rgba(59,130,246,0.08)]">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-glow text-slate-950">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-glow text-white">
                 <BrainCircuit className="h-5 w-5" />
               </span>
               <div>

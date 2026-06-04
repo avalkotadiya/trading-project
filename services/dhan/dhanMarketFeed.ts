@@ -2,11 +2,10 @@ import WebSocket from "ws";
 import { logger } from "@/lib/logger";
 import { resolveDhanAccessToken } from "@/services/dhan/dhanAuth";
 import { decodeDhanFeedPacket } from "@/services/dhan/dhanBinaryDecoder";
-import { getDhanInstrumentMaster } from "@/services/dhan/dhanInstruments";
 import { marketHistoryService } from "@/services/market-data/market-history.service";
 import { DHAN_DASHBOARD_INSTRUMENTS } from "@/lib/dhan-symbols";
-import { getCanonicalDisplayName, getCanonicalDisplaySymbol } from "@/lib/live-market-priority";
-import type { CategoryId } from "@/lib/market-categories";
+import { DHAN_LIVE_FEED_LIMITS, DHAN_MAX_LIVE_FEED_INSTRUMENTS } from "@/lib/dhan-api-limits";
+import { getSectionSymbols } from "@/services/symbols/symbol-registry";
 
 type TickListener = (tick: unknown) => void;
 // Dhan v2 MarketFeed subscription codes:
@@ -26,15 +25,11 @@ type MarketInstrument = {
   SecurityId: string;
 };
 
-function displayCategoryOf(exchangeSegment: string, instrument: string): CategoryId | null {
-  const inst = instrument.toUpperCase();
-  if (exchangeSegment === "MCX_COMM") return "commodity";
-  if (exchangeSegment === "NSE_CURRENCY" || exchangeSegment === "BSE_CURRENCY") return "currency";
-  if (inst.startsWith("OPT")) return "options";
-  if (inst.startsWith("FUT")) return "futures";
-  if (exchangeSegment === "IDX_I" || inst === "INDEX") return "indices";
-  return null;
-}
+type FeedLane = "critical" | "dashboard" | "interactive" | "bulk" | "depth" | "overflow";
+
+type SubscribeOptions = {
+  lane?: FeedLane;
+};
 
 export class FeedBackoffError extends Error {
   readonly connectionId: number;
@@ -55,9 +50,24 @@ export const isFeedBackoffError = (error: unknown): error is FeedBackoffError =>
 //   - up to 5 concurrent websocket connections per user
 //   - up to 5000 instruments per connection
 //   - up to 100 instruments per subscribe message
-const INSTRUMENTS_PER_CONNECTION = 5000;
-const BATCH_SIZE = 100;
-const MAX_CONCURRENT_CONNECTIONS = 5;
+const INSTRUMENTS_PER_CONNECTION = DHAN_LIVE_FEED_LIMITS.instrumentsPerConnection;
+const BATCH_SIZE = DHAN_LIVE_FEED_LIMITS.instrumentsPerSubscribeMessage;
+const MAX_CONCURRENT_CONNECTIONS = DHAN_LIVE_FEED_LIMITS.maxConnections;
+
+const LANE_TARGET_CONNECTIONS: Record<FeedLane, number> = {
+  critical: 1,
+  dashboard: 1,
+  interactive: 1,
+  bulk: 1,
+  depth: 1,
+  overflow: MAX_CONCURRENT_CONNECTIONS
+};
+
+function laneForRequestCode(requestCode: FeedRequestCode): FeedLane {
+  if (requestCode === 15) return "critical";
+  if (requestCode === 21 || requestCode === 19) return "depth";
+  return "interactive";
+}
 
 const exchangeSegmentFromCode: Record<number, ExchangeSegment> = {
   0: "IDX_I",
@@ -73,6 +83,7 @@ const exchangeSegmentFromCode: Record<number, ExchangeSegment> = {
 // Manages a single WebSocket connection to the Dhan feed endpoint.
 class FeedConnection {
   readonly id: number;
+  readonly lane: FeedLane;
   private socket?: WebSocket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private watchdogTimer?: ReturnType<typeof setInterval>;
@@ -88,8 +99,9 @@ class FeedConnection {
   private readonly emitTick: (tick: unknown) => void;
   private readonly pushLatest: (tick: unknown) => void;
 
-  constructor(id: number, emitTick: (tick: unknown) => void, pushLatest: (tick: unknown) => void) {
+  constructor(id: number, lane: FeedLane, emitTick: (tick: unknown) => void, pushLatest: (tick: unknown) => void) {
     this.id = id;
+    this.lane = lane;
     this.emitTick = emitTick;
     this.pushLatest = pushLatest;
   }
@@ -184,7 +196,7 @@ class FeedConnection {
     this.reconnectAttempt = 0;
     this.nextAllowedConnectAt = 0;
     this.lastError = undefined;
-    logger.info(`Dhan feed connection ${this.id} connected`);
+    logger.info(`Dhan feed connection ${this.id} connected`, { lane: this.lane });
     this.startWatchdog(socket);
     this.startKeepalive(socket);
 
@@ -423,6 +435,8 @@ class DhanMarketFeedService {
     exchangeSegment: string;
     name?: string;
   }>();
+  private lanePrewarmTimer?: ReturnType<typeof setTimeout>;
+  private lanePrewarmInFlight = false;
 
   /** Register an instrument in the symbol registry (securityId → metadata). */
   registerSymbol(securityId: string, info: {
@@ -451,12 +465,13 @@ class DhanMarketFeedService {
 
   async connect() {
     await this.ensurePrimaryConnection();
+    this.scheduleLanePrewarm();
     void this.subscribeAutoConfiguredInstruments().catch((e) => {
       logger.warn("Auto-subscribe failed", { message: e instanceof Error ? e.message : String(e) });
     });
   }
 
-  async subscribe(instruments: unknown[], requestCode: FeedRequestCode = 15) {
+  async subscribe(instruments: unknown[], requestCode: FeedRequestCode = 15, options: SubscribeOptions = {}) {
     if (!Array.isArray(instruments) || instruments.length === 0) {
       throw new Error("instruments are required.");
     }
@@ -476,7 +491,7 @@ class DhanMarketFeedService {
         }
       }
     }
-    await this.distribute(normalized, requestCode);
+    await this.distribute(normalized, requestCode, options.lane ?? laneForRequestCode(requestCode));
   }
 
   async disconnect() {
@@ -487,6 +502,7 @@ class DhanMarketFeedService {
 
   async ensureConnected() {
     await this.ensurePrimaryConnection();
+    this.scheduleLanePrewarm();
   }
 
   onTick(listener: TickListener) {
@@ -501,18 +517,48 @@ class DhanMarketFeedService {
       .map((c) => c.getNextRetryAt())
       .filter((v): v is number => typeof v === "number" && v > Date.now());
     const nextRetryAt = nextRetryCandidates.length > 0 ? Math.min(...nextRetryCandidates) : null;
+    const laneStatus = Object.entries(LANE_TARGET_CONNECTIONS).map(([lane, target]) => {
+      const laneConnections = this.connections.filter((connection) => connection.lane === lane);
+      const subscribed = laneConnections.reduce((sum, connection) => sum + connection.totalSubscribed(), 0);
+      const retryCandidates = laneConnections
+        .map((connection) => connection.getNextRetryAt())
+        .filter((value): value is number => typeof value === "number" && value > Date.now());
+      return {
+        lane,
+        target,
+        connections: laneConnections.length,
+        connected: laneConnections.filter((connection) => connection.isConnected()).length,
+        subscribed,
+        capacity: laneConnections.length * INSTRUMENTS_PER_CONNECTION,
+        remaining: laneConnections.reduce(
+          (sum, connection) => sum + Math.max(0, INSTRUMENTS_PER_CONNECTION - connection.totalSubscribed()),
+          0
+        ),
+        nextRetryAt: retryCandidates.length ? Math.min(...retryCandidates) : null,
+        lastError: laneConnections.find((connection) => connection.lastError)?.lastError ?? null
+      };
+    });
     return {
       connected: this.connections.some((c) => c.isConnected()),
       connections: this.connections.length,
       totalSubscribed: total,
+      maxConnections: MAX_CONCURRENT_CONNECTIONS,
+      instrumentsPerConnection: INSTRUMENTS_PER_CONNECTION,
+      maxLiveFeedInstruments: DHAN_MAX_LIVE_FEED_INSTRUMENTS,
+      laneTargets: LANE_TARGET_CONNECTIONS,
+      laneStatus,
+      lanePrewarmActive: Boolean(this.lanePrewarmTimer || this.lanePrewarmInFlight),
       reconnectAttempt,
       lastError: this.connections.find((c) => c.lastError)?.lastError ?? null,
       nextRetryAt,
       cachedTicks: Array.from(this.latestTicksMap.values()).slice(-20),
       perConnection: this.connections.map((c) => ({
         id: c.id,
+        lane: c.lane,
         connected: c.isConnected(),
         subscribed: c.totalSubscribed(),
+        capacity: INSTRUMENTS_PER_CONNECTION,
+        remaining: Math.max(0, INSTRUMENTS_PER_CONNECTION - c.totalSubscribed()),
         reconnectAttempt: c.getReconnectAttempt(),
         nextRetryAt: c.getNextRetryAt(),
         lastError: c.lastError ?? null
@@ -522,17 +568,78 @@ class DhanMarketFeedService {
 
   private async ensurePrimaryConnection() {
     if (this.connections.length === 0) {
-      const conn = this.spawnConnection();
+      const conn = this.spawnConnection("critical");
       await conn.connect();
     } else {
       await this.connections[0].ensureConnected();
     }
   }
 
-  private spawnConnection() {
+  private scheduleLanePrewarm(delayMs = Number(process.env.DHAN_WS_PREWARM_INITIAL_DELAY_MS || "5000")) {
+    if (process.env.DHAN_WS_PREWARM_LANES === "0") return;
+    if (this.lanePrewarmTimer || this.lanePrewarmInFlight) return;
+    if (this.connections.length >= MAX_CONCURRENT_CONNECTIONS) return;
+    this.lanePrewarmTimer = setTimeout(() => {
+      this.lanePrewarmTimer = undefined;
+      void this.prewarmNextLane();
+    }, Math.max(0, delayMs));
+  }
+
+  private async prewarmNextLane() {
+    if (this.lanePrewarmInFlight) return;
+    if (process.env.DHAN_WS_PREWARM_LANES === "0") return;
+    if (this.connections.length >= MAX_CONCURRENT_CONNECTIONS) return;
+
+    this.lanePrewarmInFlight = true;
+    const lanes: FeedLane[] = ["critical", "dashboard", "interactive", "bulk", "depth"];
+    const lane = lanes
+      .slice(0, MAX_CONCURRENT_CONNECTIONS)
+      .find((candidate) => this.laneConnectionCount(candidate) < LANE_TARGET_CONNECTIONS[candidate]);
+
+    if (!lane) {
+      this.lanePrewarmInFlight = false;
+      return;
+    }
+
+    try {
+      const conn = this.spawnConnection(lane);
+      await conn.connect();
+    } catch (error) {
+      logger.warn("Dhan lane connection prewarm failed", {
+        lane,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      this.lanePrewarmInFlight = false;
+    }
+
+    if (this.connections.length < MAX_CONCURRENT_CONNECTIONS) {
+      this.scheduleLanePrewarm(Number(process.env.DHAN_WS_PREWARM_STAGGER_MS || "20000"));
+    }
+  }
+
+  private async prewarmLaneConnections() {
+    if (process.env.DHAN_WS_PREWARM_LANES === "0") return;
+    const lanes: FeedLane[] = ["critical", "dashboard", "interactive", "bulk", "depth"];
+    for (const lane of lanes.slice(0, MAX_CONCURRENT_CONNECTIONS)) {
+      if (this.connections.length >= MAX_CONCURRENT_CONNECTIONS) return;
+      const existingForLane = this.connections.filter((connection) => connection.lane === lane).length;
+      if (existingForLane >= LANE_TARGET_CONNECTIONS[lane]) continue;
+      const conn = this.spawnConnection(lane);
+      await conn.connect().catch((error) => {
+        logger.warn("Dhan lane connection prewarm failed", {
+          lane,
+          message: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }
+  }
+
+  private spawnConnection(lane: FeedLane) {
     const id = this.nextConnectionId++;
     const conn = new FeedConnection(
       id,
+      lane,
       (tick) => { for (const l of this.listeners) l(tick); },
       (tick) => {
         // O(1) dedup: latest tick per securityId replaces previous.
@@ -548,10 +655,37 @@ class DhanMarketFeedService {
     return conn;
   }
 
-  private async distribute(instruments: MarketInstrument[], requestCode: FeedRequestCode) {
+  private laneConnectionCount(lane: FeedLane) {
+    return this.connections.filter((connection) => connection.lane === lane).length;
+  }
+
+  private pickConnection(lane: FeedLane) {
+    const sameLane = this.connections
+      .filter((connection) => connection.lane === lane && connection.hasCapacity(1))
+      .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0];
+    if (sameLane) return sameLane;
+
+    const canSpawnLane =
+      this.connections.length < MAX_CONCURRENT_CONNECTIONS &&
+      this.laneConnectionCount(lane) < LANE_TARGET_CONNECTIONS[lane];
+    if (canSpawnLane) return this.spawnConnection(lane);
+
+    if (lane !== "critical") {
+      const overflow = this.connections
+        .filter((connection) => connection.lane !== "critical" && connection.hasCapacity(1))
+        .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0];
+      if (overflow) return overflow;
+    }
+
+    return this.connections
+      .filter((connection) => connection.hasCapacity(1))
+      .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0] ?? null;
+  }
+
+  private async distribute(instruments: MarketInstrument[], requestCode: FeedRequestCode, lane: FeedLane) {
     let offset = 0;
     while (offset < instruments.length) {
-      let conn = this.connections.find((c) => c.hasCapacity(1));
+      let conn = this.pickConnection(lane);
       if (!conn) {
         // Dhan caps users at 5 concurrent live-feed websockets. Once we hit that
         // ceiling we cannot spawn another connection — packing the remainder
@@ -562,13 +696,13 @@ class DhanMarketFeedService {
         if (this.connections.length >= MAX_CONCURRENT_CONNECTIONS) {
           const remaining = instruments.length - offset;
           logger.error(
-            `Cannot subscribe ${remaining} more instrument(s): reached Dhan's 5 concurrent websocket cap and all ${this.connections.length} connections are full (${INSTRUMENTS_PER_CONNECTION} each = ${MAX_CONCURRENT_CONNECTIONS * INSTRUMENTS_PER_CONNECTION} max).`
+            `Cannot subscribe ${remaining} more instrument(s): reached Dhan's ${MAX_CONCURRENT_CONNECTIONS} concurrent websocket cap and all ${this.connections.length} connections are full (${INSTRUMENTS_PER_CONNECTION} each = ${DHAN_MAX_LIVE_FEED_INSTRUMENTS} max).`
           );
           throw new Error(
-            `Dhan live-feed capacity exhausted: ${MAX_CONCURRENT_CONNECTIONS} sockets × ${INSTRUMENTS_PER_CONNECTION} instruments = ${MAX_CONCURRENT_CONNECTIONS * INSTRUMENTS_PER_CONNECTION} max, attempted to add ${remaining} more.`
+            `Dhan live-feed capacity exhausted: ${MAX_CONCURRENT_CONNECTIONS} sockets x ${INSTRUMENTS_PER_CONNECTION} instruments = ${DHAN_MAX_LIVE_FEED_INSTRUMENTS} max, attempted to add ${remaining} more.`
           );
         }
-        conn = this.spawnConnection();
+        conn = this.spawnConnection(lane);
         await conn.connect();
       }
       const capacity = INSTRUMENTS_PER_CONNECTION - conn.totalSubscribed();
@@ -631,7 +765,7 @@ class DhanMarketFeedService {
         SecurityId: i.SecurityId
       }));
       logger.info(`Auto-subscribing ${indexInstruments.length} curated index instruments (requestCode 15)`);
-      await this.distribute(indexInstruments, 15);
+      await this.distribute(indexInstruments, 15, "critical");
     }
 
     if (curatedEquities.length > 0) {
@@ -640,7 +774,7 @@ class DhanMarketFeedService {
         SecurityId: i.SecurityId
       }));
       logger.info(`Auto-subscribing ${equityInstruments.length} curated equity/ETF instruments (requestCode 17)`);
-      await this.distribute(equityInstruments, 17);
+      await this.distribute(equityInstruments, 17, "dashboard");
     }
 
     // -----------------------------------------------------------------------
@@ -660,35 +794,22 @@ class DhanMarketFeedService {
 
       if (extraSegments.length > 0) {
         logger.info("Auto-subscribing additional segment instruments", { extraSegments });
-        const master = await getDhanInstrumentMaster();
+        const master = (await getSectionSymbols("all")).symbols;
         const instruments: MarketInstrument[] = master
           .filter((inst) => extraSegments.includes(inst.exchangeSegment as ExchangeSegment))
           .map((inst) => {
-            const displayCategory = displayCategoryOf(inst.exchangeSegment, inst.instrument);
-            const rawSymbol = inst.symbol || inst.tradingSymbol;
-            // Match live-market-universe.buildRow display rules so the SSE
-            // tick.symbol matches the table row.symbol for the same instrument.
-            // Indices must NOT prefix-collapse ("NIFTYBANK" stays "NIFTYBANK")
-            // or two distinct indices both render as "NIFTY" in the UI.
-            const displaySymbol = displayCategory && displayCategory !== "indices"
-              ? getCanonicalDisplaySymbol(displayCategory, rawSymbol)
-              : rawSymbol;
-            const displayName = displayCategory && displayCategory !== "indices"
-              ? getCanonicalDisplayName(displayCategory, rawSymbol, inst.name || inst.tradingSymbol)
-              : inst.name || inst.tradingSymbol;
-            // Register in symbol registry as we go
             this.symbolRegistry.set(inst.securityId, {
-              symbol: displaySymbol,
+              symbol: inst.symbol,
               exchange: inst.exchange as string,
-              segment: inst.segment,
+              segment: inst.segmentLabel,
               exchangeSegment: inst.exchangeSegment,
-              name: displayName
+              name: inst.name
             });
             return { ExchangeSegment: inst.exchangeSegment as ExchangeSegment, SecurityId: inst.securityId };
           });
         logger.info(`Subscribing ${instruments.length} additional segment instruments across ${Math.ceil(instruments.length / INSTRUMENTS_PER_CONNECTION)} connection(s)`, { extraSegments });
         if (instruments.length > 0) {
-          await this.distribute(instruments, requestCode);
+          await this.distribute(instruments, requestCode, "bulk");
         }
       }
     }
@@ -702,7 +823,7 @@ class DhanMarketFeedService {
         const parsed = JSON.parse(raw) as unknown[];
         const normalized = this.normalizeInstruments(parsed);
         if (normalized.length) {
-          await this.distribute(normalized, 15);
+          await this.distribute(normalized, 15, "bulk");
         }
       } catch {
         logger.warn("Invalid DHAN_AUTO_SUBSCRIBE_JSON; skipping custom auto-subscribe");

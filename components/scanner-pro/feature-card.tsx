@@ -36,7 +36,7 @@ const CONTENT: Record<MarketPulseCategory, CardContent> = {
     title: "INTRADAY BOOST",
     tagline: "Momentum surge with R-Factor scoring",
     icon: Activity,
-    accentColor: "text-cyan-400 bg-cyan-500/10 ring-cyan-500/20",
+    accentColor: "text-sapphire-soft bg-sapphire-glow/10 ring-sapphire-glow/20",
     description:
       "Ranks stocks by intraday momentum using the R-Factor — a composite of % change, volume, and order-flow imbalance. Stocks with R.Fac > 3 are experiencing abnormal momentum worth trading.",
     guide: [
@@ -115,7 +115,7 @@ export function ScannerFeatureCard({ category }: FeatureCardProps) {
             <ul className="space-y-1">
               {guide.map((step, i) => (
                 <li key={i} className="flex gap-2 text-[11px] text-slate-400">
-                  <span className="mt-0.5 shrink-0 text-cyan-600">—</span>
+                  <span className="mt-0.5 shrink-0 text-sapphire-core">—</span>
                   {step}
                 </li>
               ))}

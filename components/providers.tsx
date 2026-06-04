@@ -29,7 +29,7 @@ export function Providers({ children, clerkPublishableKey, nonce }: ProvidersPro
         },
         elements: {
           cardBox: "shadow-none",
-          footerActionLink: "text-cyan-300"
+          footerActionLink: "text-sapphire-soft"
         }
       }}
     >

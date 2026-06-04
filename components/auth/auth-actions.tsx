@@ -21,7 +21,7 @@ export function HeaderAuthActions({ clerkEnabled }: AuthActionsProps) {
         </Link>
         <Link
           href="/sign-up"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-glow px-4 text-sm font-medium text-slate-950 shadow-glow transition hover:bg-cyan-soft"
+          className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-glow px-4 text-sm font-medium text-white shadow-glow transition hover:bg-cyan-soft"
         >
           Sign up
         </Link>
@@ -43,7 +43,7 @@ export function HeaderAuthActions({ clerkEnabled }: AuthActionsProps) {
           </SignInButton>
           <SignUpButton mode="modal">
             <button
-              className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-glow px-4 text-sm font-medium text-slate-950 shadow-glow transition hover:bg-cyan-soft"
+              className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-glow px-4 text-sm font-medium text-white shadow-glow transition hover:bg-cyan-soft"
               type="button"
             >
               Sign up

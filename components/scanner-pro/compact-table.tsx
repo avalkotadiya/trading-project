@@ -250,7 +250,7 @@ function BreakoutHeader({
       )}
     >
       {label}
-      <ArrowUpDown className={cn("h-2.5 w-2.5", sortBy === key ? "text-cyan-400" : "")} />
+      <ArrowUpDown className={cn("h-2.5 w-2.5", sortBy === key ? "text-sapphire-soft" : "")} />
     </button>
   );
 
@@ -284,7 +284,7 @@ function IntradayHeader({
           className="ml-auto flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600 transition-colors hover:text-slate-300"
         >
           R.Fac
-          <ArrowUpDown className={cn("h-2.5 w-2.5", sortBy === "R-Factor" ? "text-cyan-400" : "")} />
+          <ArrowUpDown className={cn("h-2.5 w-2.5", sortBy === "R-Factor" ? "text-sapphire-soft" : "")} />
         </button>
       </div>
       <div className="w-8 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600">Sgn</div>

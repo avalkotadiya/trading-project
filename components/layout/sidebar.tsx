@@ -71,11 +71,11 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
               className={cn(
                 "group relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition duration-200",
                 active
-                  ? "bg-cyan-glow/[0.14] text-cyan-soft shadow-[inset_0_0_0_1px_rgba(56,232,255,0.22),0_12px_30px_rgba(56,232,255,0.08)]"
+                  ? "bg-cyan-glow/[0.14] text-cyan-soft shadow-[inset_0_0_0_1px_rgba(59,130,246,0.22),0_12px_30px_rgba(59,130,246,0.08)]"
                   : "text-slate-400 hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-white"
               )}
             >
-              {active && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-cyan-glow shadow-[0_0_12px_rgba(56,232,255,0.9)]" />}
+              {active && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-cyan-glow shadow-[0_0_12px_rgba(59,130,246,0.9)]" />}
               <Icon className={cn("h-4 w-4 shrink-0", active ? "text-cyan-soft" : "text-slate-500 group-hover:text-slate-300")} />
               <span>{item.label}</span>
             </Link>

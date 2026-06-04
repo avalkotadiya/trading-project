@@ -40,7 +40,7 @@ export function BottomNavigation() {
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute top-0 h-0.5 w-8 bg-cyan-glow shadow-[0_0_8px_rgba(56,232,255,0.8)]" />
+                <div className="absolute top-0 h-0.5 w-8 bg-cyan-glow shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
               )}
             </Link>
           );

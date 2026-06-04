@@ -93,8 +93,20 @@ export class MarketCacheService {
     return readJson<NormalizedTick>(getMarketTickCacheKey(symbol));
   }
 
+  async getLatestTicks(symbols: Array<Pick<MarketSymbol, "exchange" | "symbol">>) {
+    return Promise.all(symbols.map((symbol) => this.getLatestTick(symbol)));
+  }
+
+  async setLatestTicks(ticks: NormalizedTick[], ttlSeconds = DEFAULT_TICK_TTL_SECONDS) {
+    await Promise.all(ticks.map((tick) => this.setLatestTick(tick, ttlSeconds)));
+  }
+
   async setSnapshot(snapshot: MarketSnapshot, ttlSeconds = DEFAULT_SNAPSHOT_TTL_SECONDS) {
     await writeJson(getMarketSnapshotCacheKey(snapshot), snapshot, ttlSeconds);
+  }
+
+  async setSnapshots(snapshots: MarketSnapshot[], ttlSeconds = DEFAULT_SNAPSHOT_TTL_SECONDS) {
+    await Promise.all(snapshots.map((snapshot) => this.setSnapshot(snapshot, ttlSeconds)));
   }
 
   async getSnapshot(symbol: Pick<MarketSymbol, "exchange" | "symbol">) {

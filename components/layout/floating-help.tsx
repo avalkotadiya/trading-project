@@ -15,7 +15,7 @@ export function FloatingHelpButton() {
           "fixed bottom-20 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-300 md:bottom-8",
           isOpen 
             ? "bg-slate-800 text-white rotate-90" 
-            : "bg-cyan-glow text-slate-950 hover:scale-110 shadow-[0_0_20px_rgba(56,232,255,0.4)]"
+            : "bg-cyan-glow text-white hover:scale-110 shadow-[0_0_20px_rgba(59,130,246,0.4)]"
         )}
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}

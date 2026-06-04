@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
+import { SYMBOL_RATE_LIMITS } from "@/lib/symbol-rate-policy";
 import { querySymbols } from "@/services/symbols/symbol-registry";
 import { toDhanDisplaySegment } from "@/services/dhan/dhanChartValidation";
 
 export async function GET(request: NextRequest) {
-  const limit = await rateLimit(request, "dhan:instruments:search", { limit: 120, windowMs: 60_000 });
+  const limit = await rateLimit(request, "dhan:instruments:search", SYMBOL_RATE_LIMITS.search);
   if (!limit.allowed) return fail("RATE_LIMITED", "Too many Dhan instrument search requests.", 429);
 
   const query = request.nextUrl.searchParams.get("q") ?? "";

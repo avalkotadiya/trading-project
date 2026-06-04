@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
+import { SYMBOL_RATE_LIMITS } from "@/lib/symbol-rate-policy";
+import { DHAN_LIVE_FEED_LIMITS, DHAN_MAX_LIVE_FEED_INSTRUMENTS, UI_SYMBOL_LIMITS } from "@/lib/dhan-api-limits";
 import { queryLiveMarketCategory } from "@/services/market-data/live-market-universe.service";
 import type { CategoryId } from "@/lib/market-categories";
 
@@ -23,12 +25,16 @@ const querySchema = z.object({
     ])
     .default("all"),
   q: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().positive().max(400).default(200),
+  limit: z.coerce.number().int().positive().max(UI_SYMBOL_LIMITS.registryPageSize).default(UI_SYMBOL_LIMITS.liveTablePageSize),
   offset: z.coerce.number().int().nonnegative().default(0)
 });
 
+const LIVE_TABLE_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=15, stale-while-revalidate=60"
+};
+
 export async function GET(request: NextRequest) {
-  const limit = await rateLimit(request, "market:live-table", { limit: 90, windowMs: 60_000 });
+  const limit = await rateLimit(request, "market:live-table", SYMBOL_RATE_LIMITS.liveTable);
   if (!limit.allowed) {
     return fail("RATE_LIMITED", "Too many live market table requests.", 429);
   }
@@ -54,7 +60,17 @@ export async function GET(request: NextRequest) {
       offset
     });
 
-    return ok(result);
+    return ok({
+      ...result,
+      limits: {
+        maxConnections: DHAN_LIVE_FEED_LIMITS.maxConnections,
+        instrumentsPerConnection: DHAN_LIVE_FEED_LIMITS.instrumentsPerConnection,
+        instrumentsPerSubscribeMessage: DHAN_LIVE_FEED_LIMITS.instrumentsPerSubscribeMessage,
+        maxLiveFeedInstruments: DHAN_MAX_LIVE_FEED_INSTRUMENTS
+      }
+    }, {
+      headers: LIVE_TABLE_CACHE_HEADERS
+    });
   } catch (error) {
     return fail(
       "LIVE_MARKET_TABLE_FAILED",

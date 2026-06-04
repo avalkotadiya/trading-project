@@ -9,6 +9,7 @@ import {
   type CategoryId
 } from "@/lib/market-categories";
 import { compareByKnownPriority } from "@/lib/live-market-priority";
+import { DHAN_LIVE_FEED_LIMITS, UI_SYMBOL_LIMITS } from "@/lib/dhan-api-limits";
 import { MarketSymbolSelector, type MarketInstrument } from "@/components/shared/market-symbol-selector";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,11 +18,13 @@ import type { MarketConnectionStatus, MarketTick } from "@/types/market";
 import { cn } from "@/utils/cn";
 import { formatCompact, formatPercent, formatPrice } from "@/utils/format";
 
-const PAGE_SIZE = 120;
-const SUBSCRIBE_BATCH_SIZE = 100;
+const PAGE_SIZE = UI_SYMBOL_LIMITS.liveTablePageSize;
+const SUBSCRIBE_BATCH_SIZE = DHAN_LIVE_FEED_LIMITS.instrumentsPerSubscribeMessage;
 const VIRTUALIZE_AFTER_ROWS = 80;
 const VIRTUAL_ROW_HEIGHT = 46;
 const VIRTUAL_OVERSCAN = 12;
+const LIVE_TABLE_CACHE_TTL_MS = 30_000;
+const SEARCH_DEBOUNCE_MS = 180;
 
 type MarketDataBoardProps = {
   initialTicks: MarketTick[];
@@ -63,6 +66,17 @@ type LiveTableResponse = {
   offset: number;
   limit: number;
   symbols: LiveMarketSymbolRow[];
+  limits?: {
+    maxConnections: number;
+    instrumentsPerConnection: number;
+    instrumentsPerSubscribeMessage: number;
+    maxLiveFeedInstruments: number;
+  };
+};
+
+type LiveTableCacheEntry = {
+  data: LiveTableResponse;
+  fetchedAt: number;
 };
 
 type RowWithTick = {
@@ -90,6 +104,78 @@ const CATEGORY_IDS: CategoryId[] = [
   "currency",
   "etf"
 ];
+
+const liveTableCache = new Map<string, LiveTableCacheEntry>();
+const liveTableInFlight = new Map<string, Promise<LiveTableResponse>>();
+
+function buildLiveTableCacheKey(category: CategoryId, query: string, offset: number, limit: number) {
+  return JSON.stringify({ category, query, offset, limit });
+}
+
+async function fetchLiveTableRows(category: CategoryId, query: string, offset: number, limit: number) {
+  const key = buildLiveTableCacheKey(category, query, offset, limit);
+  const cached = liveTableCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < LIVE_TABLE_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const existing = liveTableInFlight.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const params = new URLSearchParams({
+      category,
+      limit: String(limit),
+      offset: String(offset)
+    });
+    if (query) {
+      params.set("q", query);
+    }
+
+    const response = await fetch(`/api/market/live-table?${params.toString()}`);
+
+    const payload = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      data?: LiveTableResponse;
+      error?: { message?: string };
+    } | null;
+
+    if (!response.ok || !payload?.ok || !payload.data) {
+      throw new Error(payload?.error?.message ?? "Live table API unavailable.");
+    }
+
+    liveTableCache.set(key, {
+      data: payload.data,
+      fetchedAt: Date.now()
+    });
+    return payload.data;
+  })();
+
+  liveTableInFlight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    liveTableInFlight.delete(key);
+  }
+}
+
+function getCachedLiveTableRows(category: CategoryId, query: string, offset: number, limit: number) {
+  const key = buildLiveTableCacheKey(category, query, offset, limit);
+  const cached = liveTableCache.get(key);
+  if (!cached || Date.now() - cached.fetchedAt >= LIVE_TABLE_CACHE_TTL_MS) return null;
+  return cached.data;
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
+}
 
 function getStatusTone(status: MarketConnectionStatus) {
   if (status === "live" || status === "polling") return "green" as const;
@@ -265,7 +351,8 @@ export function MarketDataBoard({
   const [useFallbackUniverse, setUseFallbackUniverse] = useState(false);
 
   const [searchInput, setSearchInput] = useState("");
-  const deferredQuery = useDeferredValue(normalizeSearchInput(searchInput));
+  const debouncedSearchInput = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
+  const deferredQuery = useDeferredValue(normalizeSearchInput(debouncedSearchInput));
 
   const prevPricesRef = useRef<Record<string, number>>({});
   const subscribedKeysRef = useRef<Set<string>>(new Set());
@@ -435,6 +522,7 @@ export function MarketDataBoard({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               requestCode,
+              lane: requestCode === 15 ? "critical" : requestCode === 21 ? "depth" : "dashboard",
               instruments: chunk.map((item) => ({
                 ExchangeSegment: item.exchangeSegment,
                 SecurityId: item.securityId
@@ -469,7 +557,6 @@ export function MarketDataBoard({
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
 
     async function loadCategoryRows() {
       const applyFallback = () => {
@@ -486,49 +573,39 @@ export function MarketDataBoard({
         setUseFallbackUniverse(true);
       };
 
+      const cached = getCachedLiveTableRows(activeSegment, deferredQuery, categoryOffset, PAGE_SIZE);
+      if (cached) {
+        setCategoryLoading(false);
+        setUseFallbackUniverse(false);
+        setCategoryMeta(cached.categories);
+        setCategoryRows(cached.symbols);
+        setCategoryTotal(cached.total);
+        setStatusMsg("");
+        if (cached.symbols.length > 0) {
+          void subscribeCategoryRows(cached.symbols);
+        }
+        return;
+      }
+
       setCategoryLoading(true);
       try {
-        const params = new URLSearchParams({
-          category: activeSegment,
-          limit: String(PAGE_SIZE),
-          offset: String(categoryOffset)
-        });
-        if (deferredQuery) {
-          params.set("q", deferredQuery);
-        }
-
-        const response = await fetch(`/api/market/live-table?${params.toString()}`, {
-          cache: "no-store",
-          signal: controller.signal
-        });
-
-        const payload = (await response.json().catch(() => null)) as {
-          ok?: boolean;
-          data?: LiveTableResponse;
-          error?: { message?: string };
-        } | null;
+        const data = await fetchLiveTableRows(activeSegment, deferredQuery, categoryOffset, PAGE_SIZE);
 
         if (cancelled) return;
 
-        if (!response.ok || !payload?.ok || !payload.data) {
-          applyFallback();
-          setStatusMsg(payload?.error?.message ?? "Live table API unavailable; showing stream fallback symbols.");
-          return;
-        }
-
         setUseFallbackUniverse(false);
-        setCategoryMeta(payload.data.categories);
-        setCategoryRows(payload.data.symbols);
-        setCategoryTotal(payload.data.total);
+        setCategoryMeta(data.categories);
+        setCategoryRows(data.symbols);
+        setCategoryTotal(data.total);
         setStatusMsg("");
 
-        if (payload.data.symbols.length > 0) {
-          void subscribeCategoryRows(payload.data.symbols);
+        if (data.symbols.length > 0) {
+          void subscribeCategoryRows(data.symbols);
         }
-      } catch {
+      } catch (loadError) {
         if (!cancelled) {
           applyFallback();
-          setStatusMsg("Live table API unavailable; showing stream fallback symbols.");
+          setStatusMsg(loadError instanceof Error ? loadError.message : "Live table API unavailable; showing stream fallback symbols.");
         }
       } finally {
         if (!cancelled) {
@@ -541,7 +618,6 @@ export function MarketDataBoard({
 
     return () => {
       cancelled = true;
-      controller.abort();
     };
   }, [activeSegment, categoryOffset, deferredQuery, subscribeCategoryRows]);
 
@@ -592,6 +668,7 @@ export function MarketDataBoard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         requestCode: 17,
+        lane: "interactive",
         instruments: [{ ExchangeSegment: instrument.exchangeSegment, SecurityId: instrument.securityId }],
         meta: [{
           SecurityId: instrument.securityId,
@@ -731,7 +808,7 @@ export function MarketDataBoard({
               className={cn(
                 "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                 activeSegment === seg.id
-                  ? "bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/30"
+                  ? "bg-sapphire-glow/20 text-sapphire-soft ring-1 ring-sapphire-glow/30"
                   : "text-slate-400 hover:bg-white/[0.06] hover:text-white"
               )}
               title={seg.description}
@@ -748,7 +825,7 @@ export function MarketDataBoard({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Filter symbols, name, security id, ISIN..."
-            className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
+            className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-sapphire-glow/40 focus:outline-none focus:ring-1 focus:ring-sapphire-glow/20"
           />
         </div>
 

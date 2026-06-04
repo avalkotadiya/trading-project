@@ -21,21 +21,26 @@ const emptyMarket = {
 };
 
 export default async function DashboardPage() {
-  const { watchlists, alerts, billingOverview } = await getDashboardData();
-
   // Pull the dashboard's symbol list from the central registry (India-only).
   // Fall back to the legacy hardcoded list if the registry can't deliver
   // (cold-start cache miss or scrip-master fetch failure) so the page still
   // renders something — same surface as before.
-  let dashboardSymbols: string[] = DASHBOARD_SYMBOLS;
-  try {
+  const dashboardDataPromise = getDashboardData();
+  const dashboardSymbolsPromise = (async () => {
     const view = await getSectionSymbols("dashboard");
-    if (view.symbols.length > 0) {
-      dashboardSymbols = view.symbols.map((s) => `${s.exchange}:${s.symbol}`);
+    if (view.symbols.length === 0) {
+      return DASHBOARD_SYMBOLS;
     }
-  } catch (error) {
+    return view.symbols.map((s) => `${s.exchange}:${s.symbol}`);
+  })().catch((error) => {
     console.warn("[Dashboard] Registry unavailable, using hardcoded fallback:", error instanceof Error ? error.message : error);
-  }
+    return DASHBOARD_SYMBOLS;
+  });
+
+  const [{ watchlists, alerts, billingOverview }, dashboardSymbols] = await Promise.all([
+    dashboardDataPromise,
+    dashboardSymbolsPromise
+  ]);
 
   let market: Awaited<ReturnType<typeof getMarketSnapshot>>;
   try {
@@ -91,6 +96,7 @@ export default async function DashboardPage() {
         billingOverview={billingOverview}
         market={market}
         token={token}
+        dashboardSymbols={dashboardSymbols}
       />
     </div>
   );

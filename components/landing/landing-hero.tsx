@@ -9,7 +9,7 @@ export function LandingHero() {
       <div className="absolute inset-x-0 top-0 h-80 bg-gradient-to-b from-cyan-glow/[0.1] to-transparent" />
       <div className="relative mx-auto grid max-w-7xl gap-8 px-4 pb-12 sm:px-6 lg:px-8">
         <div className="max-w-4xl pt-10">
-          <Badge tone="cyan" className="gap-2 shadow-[0_0_36px_rgba(56,232,255,0.12)]">
+          <Badge tone="cyan" className="gap-2 shadow-[0_0_36px_rgba(59,130,246,0.12)]">
             <Zap className="h-3.5 w-3.5" />
             AI-powered Indian market intelligence
           </Badge>
@@ -22,7 +22,7 @@ export function LandingHero() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/dashboard"
-              className="kinetic-sheen inline-flex h-12 items-center justify-center gap-2 rounded-md bg-cyan-glow px-5 text-sm font-semibold text-slate-950 shadow-[0_18px_46px_rgba(56,232,255,0.24)] transition hover:-translate-y-0.5 hover:bg-cyan-soft"
+              className="kinetic-sheen inline-flex h-12 items-center justify-center gap-2 rounded-md bg-cyan-glow px-5 text-sm font-semibold text-white shadow-[0_18px_46px_rgba(59,130,246,0.24)] transition hover:-translate-y-0.5 hover:bg-cyan-soft"
             >
               Launch demo
               <ArrowRight className="h-4 w-4" />

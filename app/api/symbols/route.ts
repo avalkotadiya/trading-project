@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api-response";
+import { rateLimit } from "@/lib/rate-limit";
+import { SYMBOL_RATE_LIMITS } from "@/lib/symbol-rate-policy";
+import { UI_SYMBOL_LIMITS } from "@/lib/dhan-api-limits";
 import {
   listSections,
   querySymbols,
@@ -41,12 +44,21 @@ const querySchema = z.object({
   section: z.enum(SECTION_IDS).optional(),
   segment: z.string().trim().min(1).max(20).optional(),
   q: z.string().trim().max(80).optional(),
-  limit: z.coerce.number().int().positive().max(500).optional(),
+  limit: z.coerce.number().int().positive().max(UI_SYMBOL_LIMITS.registryPageSize).optional(),
   offset: z.coerce.number().int().nonnegative().optional()
 });
 
+const SYMBOL_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
+};
+
 export async function GET(request: NextRequest) {
   try {
+    const requestLimit = await rateLimit(request, "symbols:registry", SYMBOL_RATE_LIMITS.registry);
+    if (!requestLimit.allowed) {
+      return fail("RATE_LIMITED", "Too many symbol registry requests.", 429);
+    }
+
     const url = new URL(request.url);
     const parsed = querySchema.safeParse({
       section: url.searchParams.get("section") ?? undefined,
@@ -66,6 +78,8 @@ export async function GET(request: NextRequest) {
         sections: listSections(),
         india_only: true,
         usage: "GET /api/symbols?section=<id>&segment=<NSE_EQ|...>&q=<text>&limit=&offset="
+      }, {
+        headers: SYMBOL_CACHE_HEADERS
       });
     }
 
@@ -80,6 +94,8 @@ export async function GET(request: NextRequest) {
       india_only: true,
       section: section ?? "all",
       ...result
+    }, {
+      headers: SYMBOL_CACHE_HEADERS
     });
   } catch (error) {
     return fail(

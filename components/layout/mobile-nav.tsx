@@ -38,7 +38,7 @@ export function MobileNav({ isAdmin = false }: MobileNavProps) {
               href={item.href}
               className={cn(
                 "flex h-14 min-w-[4.4rem] flex-col items-center justify-center gap-1 rounded-md px-1 text-[10px] transition min-[390px]:text-xs",
-                active ? "bg-cyan-glow/[0.12] text-cyan-soft shadow-[inset_0_0_0_1px_rgba(56,232,255,0.2)]" : "text-slate-500 hover:bg-white/[0.06] hover:text-white"
+                active ? "bg-cyan-glow/[0.12] text-cyan-soft shadow-[inset_0_0_0_1px_rgba(59,130,246,0.2)]" : "text-slate-500 hover:bg-white/[0.06] hover:text-white"
               )}
             >
               <Icon className="h-4 w-4" />

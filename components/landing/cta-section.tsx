@@ -14,7 +14,7 @@ export function CtaSection() {
             </p>
             <Link
               href="/dashboard"
-              className="kinetic-sheen mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md bg-cyan-glow px-5 text-sm font-semibold text-slate-950 shadow-[0_18px_46px_rgba(56,232,255,0.22)] transition hover:-translate-y-0.5 hover:bg-cyan-soft"
+              className="kinetic-sheen mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-md bg-cyan-glow px-5 text-sm font-semibold text-white shadow-[0_18px_46px_rgba(59,130,246,0.22)] transition hover:-translate-y-0.5 hover:bg-cyan-soft"
             >
               Open dashboard
               <ArrowRight className="h-4 w-4" />

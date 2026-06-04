@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
+import { SYMBOL_RATE_LIMITS } from "@/lib/symbol-rate-policy";
 import { querySymbols } from "@/services/symbols/symbol-registry";
 import { toDhanDisplaySegment } from "@/services/dhan/dhanChartValidation";
 
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 //   limit         max results to return (default 60, max 200)
 //   offset        pagination offset (default 0)
 export async function GET(request: NextRequest) {
-  const limit = await rateLimit(request, "dhan:instruments:by-segment", { limit: 120, windowMs: 60_000 });
+  const limit = await rateLimit(request, "dhan:instruments:by-segment", SYMBOL_RATE_LIMITS.search);
   if (!limit.allowed) return fail("RATE_LIMITED", "Too many requests.", 429);
 
   const params = request.nextUrl.searchParams;

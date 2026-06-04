@@ -48,14 +48,14 @@ const ORDER_FILTERS = ["ALL", "FILLED", "PENDING", "REJECTED", "CANCELLED"] as c
 
 const STATUS_STYLE: Record<string, string> = {
   FILLED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  PENDING: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  PENDING: "bg-sapphire-glow/10 text-sapphire-soft border-sapphire-glow/20",
   REJECTED: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   CANCELLED: "bg-rose-500/10 text-rose-400 border-rose-500/20"
 };
 
 const AVATAR_PALETTE = [
   "from-emerald-900 to-emerald-800 ring-emerald-700/40",
-  "from-cyan-900 to-cyan-800 ring-cyan-700/40",
+  "from-sky-900 to-sky-800 ring-sky-700/40",
   "from-indigo-900 to-indigo-800 ring-indigo-700/40",
   "from-amber-900 to-amber-800 ring-amber-700/40",
   "from-rose-900 to-rose-800 ring-rose-700/40"
@@ -329,11 +329,11 @@ export function PortfolioHub({ initialHoldings, orders, token }: Props) {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold transition-all",
                 active
-                  ? "bg-[#0d1f35] text-white shadow-md ring-1 ring-cyan-500/20"
+                  ? "bg-[#0d1f35] text-white shadow-md ring-1 ring-sapphire-glow/20"
                   : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
               )}
             >
-              <Icon className={cn("h-4 w-4", active ? "text-cyan-400" : "text-slate-600")} />
+              <Icon className={cn("h-4 w-4", active ? "text-sapphire-soft" : "text-slate-600")} />
               {t.label}
               {t.id === "orders" && (
                 <span className="rounded-full bg-white/[0.06] px-1.5 text-[10px] text-slate-400">{orders.length}</span>
@@ -526,7 +526,7 @@ export function PortfolioHub({ initialHoldings, orders, token }: Props) {
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium transition",
                   orderFilter === f
-                    ? "bg-cyan-glow/[0.18] text-cyan-soft ring-1 ring-inset ring-cyan-500/20"
+                    ? "bg-cyan-glow/[0.18] text-cyan-soft ring-1 ring-inset ring-sapphire-glow/20"
                     : "bg-white/[0.06] text-slate-400 hover:bg-white/[0.10] hover:text-white"
                 )}
               >

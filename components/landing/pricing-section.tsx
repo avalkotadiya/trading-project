@@ -46,7 +46,7 @@ export function PricingSection() {
                 className={cn(
                   "mt-6 inline-flex h-11 items-center justify-center rounded-md px-4 text-sm font-semibold transition hover:-translate-y-0.5",
                   plan.highlighted
-                    ? "kinetic-sheen bg-cyan-glow text-slate-950 shadow-[0_18px_46px_rgba(56,232,255,0.2)] hover:bg-cyan-soft"
+                    ? "kinetic-sheen bg-cyan-glow text-white shadow-[0_18px_46px_rgba(59,130,246,0.2)] hover:bg-cyan-soft"
                     : "holo-edge border border-white/10 bg-white/[0.08] text-white hover:bg-white/[0.12]"
                 )}
               >

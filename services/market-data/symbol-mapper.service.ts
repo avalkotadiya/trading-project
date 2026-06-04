@@ -1,12 +1,15 @@
 import symbolMaster from "@/data/symbol-master.sample.json";
 import type { MarketExchange, MarketSegment, MarketSymbol } from "@/services/market-data/market-data.types";
-import { isMainSymbolForCategory } from "@/lib/live-market-priority";
-import { getDhanInstrumentMaster } from "@/services/dhan/dhanInstruments";
 import {
-  normalizeDhanChartInstrument,
   toDhanDisplaySegment,
   type DhanChartExchangeSegment
 } from "@/services/dhan/dhanChartValidation";
+import {
+  getSectionSymbols,
+  querySymbols,
+  resolveSymbol,
+  type RegistrySymbol
+} from "@/services/symbols/symbol-registry";
 
 type SymbolMasterRecord = MarketSymbol;
 
@@ -74,90 +77,51 @@ export function resolveMarketSymbols(inputs: string[], fallbackExchange: MarketE
   return Array.from(unique.values());
 }
 
-export function searchMarketSymbols(query: string, limit = 20) {
-  const normalizedQuery = normalize(query);
+export function registrySymbolToMarketSymbol(row: RegistrySymbol): MarketSymbol {
+  const segment = toDhanDisplaySegment(row.exchangeSegment, row.instrument) as MarketSegment;
 
-  if (!normalizedQuery) {
-    return symbols.slice(0, limit);
-  }
-
-  return symbols
-    .filter((symbol) =>
-      [
-        symbol.symbol,
-        symbol.tradingSymbol,
-        symbol.instrumentToken,
-        symbol.bseScripCode,
-        symbol.isin,
-        symbol.companyName
-      ]
-        .filter(Boolean)
-        .some((value) => normalize(String(value)).includes(normalizedQuery))
-    )
-    .slice(0, limit);
+  return {
+    exchange: row.exchange,
+    segment,
+    symbol: normalize(row.symbol),
+    instrumentToken: row.securityId,
+    exchangeSegment: row.exchangeSegment,
+    instrument: row.instrument,
+    instrumentType: row.instrument,
+    chartInstrument: row.chartInstrument,
+    tradingSymbol: row.tradingSymbol,
+    bseScripCode: row.exchange === "BSE" ? row.securityId : null,
+    isin: row.isin,
+    companyName: row.name,
+    lotSize: row.lotSize,
+    expiry: row.expiry,
+    strikePrice: row.strikePrice,
+    optionType: row.optionType === "CE" || row.optionType === "PE" ? row.optionType : null
+  };
 }
 
-// ── Dhan scrip-master backed resolution ──────────────────────────────────────
-// The bundled symbol-master.sample.json only has ~32 symbols. The scanner and
-// other pages reference 180+ symbols, so resolution must fall back to the full
-// live Dhan instrument master (50k+ rows) to obtain the correct SecurityId.
-// Indexed by `${exchange}:${NORMALIZED_NAME}` for both the display symbol and
-// the trading symbol so inputs like "BAJAJ-AUTO" / "M&M" still match.
+export async function searchMarketSymbols(query: string, limit = 20) {
+  const page = await querySymbols({
+    section: "all",
+    query,
+    limit
+  });
 
-let dhanSymbolIndex: Map<string, MarketSymbol> | null = null;
-let dhanSymbolIndexPromise: Promise<Map<string, MarketSymbol>> | null = null;
+  return page.symbols.map(registrySymbolToMarketSymbol);
+}
 
-async function buildDhanSymbolIndex(): Promise<Map<string, MarketSymbol>> {
-  const rows = await getDhanInstrumentMaster();
+let registrySymbolIndex: Map<string, MarketSymbol> | null = null;
+let registrySymbolIndexPromise: Promise<Map<string, MarketSymbol>> | null = null;
+
+async function buildRegistrySymbolIndex(): Promise<Map<string, MarketSymbol>> {
+  const rows = (await getSectionSymbols("all")).symbols;
   const map = new Map<string, MarketSymbol>();
 
   for (const row of rows) {
-    const seg = String(row.exchangeSegment || "");
-    // Scanner/dashboard use cash equities and indices only — skip F&O,
-    // currency and commodity rows so trading symbols don't collide.
-    const segment = toDhanDisplaySegment(seg, row.instrument) as MarketSegment;
-
-    const exchange: MarketExchange = row.exchange === "BSE" ? "BSE" : row.exchange === "MCX" ? "MCX" : "NSE";
-    const entry: MarketSymbol = {
-      exchange,
-      segment,
-      symbol: normalize(row.symbol),
-      // The provider derives the Dhan SecurityId from instrumentToken digits,
-      // so store the real numeric SecurityId here.
-      instrumentToken: row.securityId,
-      exchangeSegment: row.exchangeSegment,
-      instrument: row.instrument ?? null,
-      instrumentType: row.exchInstrumentType ?? null,
-      chartInstrument: normalizeDhanChartInstrument(row.instrument, row.exchangeSegment),
-      tradingSymbol: row.tradingSymbol ?? null,
-      bseScripCode: exchange === "BSE" ? row.securityId : null,
-      isin: row.isin ?? null,
-      companyName: row.name ?? row.symbol,
-      lotSize: row.lotSize ?? null,
-      expiry: row.expiry ?? null,
-      strikePrice: row.strikePrice ?? null,
-      optionType: row.optionType === "CE" || row.optionType === "PE" ? row.optionType : null
-    };
-
-    const isMain = (() => {
-      if (segment === "INDEX") return isMainSymbolForCategory("indices", entry.symbol);
-      if (segment === "COMM") return isMainSymbolForCategory("commodity", entry.symbol);
-      if (segment === "CURRENCY") return isMainSymbolForCategory("currency", entry.symbol);
-      if (segment === "FNO") {
-        const inst = `${entry.instrumentType || ""}|${entry.instrument || ""}`.toUpperCase();
-        return inst.includes("OPT")
-          ? isMainSymbolForCategory("options", entry.symbol)
-          : isMainSymbolForCategory("futures", entry.symbol);
-      }
-      return exchange === "BSE"
-        ? isMainSymbolForCategory("bse-eq", entry.symbol) || isMainSymbolForCategory("etf", entry.symbol)
-        : isMainSymbolForCategory("nse-eq", entry.symbol) || isMainSymbolForCategory("etf", entry.symbol);
-    })();
-    if (!isMain) continue;
-
-    for (const name of [row.symbol, row.tradingSymbol]) {
+    const entry = registrySymbolToMarketSymbol(row);
+    for (const name of [row.symbol, row.tradingSymbol, row.securityId, row.isin]) {
       if (!name) continue;
-      const key = `${exchange}:${normalize(String(name))}`;
+      const key = `${row.exchange}:${normalize(String(name))}`;
       if (!map.has(key)) map.set(key, entry);
     }
   }
@@ -165,21 +129,20 @@ async function buildDhanSymbolIndex(): Promise<Map<string, MarketSymbol>> {
   return map;
 }
 
-async function getDhanSymbolIndex(): Promise<Map<string, MarketSymbol>> {
-  if (dhanSymbolIndex) return dhanSymbolIndex;
-  if (!dhanSymbolIndexPromise) {
-    dhanSymbolIndexPromise = buildDhanSymbolIndex()
+async function getRegistrySymbolIndex(): Promise<Map<string, MarketSymbol>> {
+  if (registrySymbolIndex) return registrySymbolIndex;
+  if (!registrySymbolIndexPromise) {
+    registrySymbolIndexPromise = buildRegistrySymbolIndex()
       .then((map) => {
-        dhanSymbolIndex = map;
+        registrySymbolIndex = map;
         return map;
       })
       .catch(() => {
-        // Allow a later retry if the master fetch failed.
-        dhanSymbolIndexPromise = null;
+        registrySymbolIndexPromise = null;
         return new Map<string, MarketSymbol>();
       });
   }
-  return dhanSymbolIndexPromise;
+  return registrySymbolIndexPromise;
 }
 
 export async function resolveMarketSymbolAsync(
@@ -189,8 +152,11 @@ export async function resolveMarketSymbolAsync(
   const direct = resolveMarketSymbol(input, fallbackExchange);
   if (direct) return direct;
 
+  const registryDirect = await resolveSymbol(input).catch(() => null);
+  if (registryDirect) return registrySymbolToMarketSymbol(registryDirect);
+
   const { exchange, query } = parseSymbolInput(input, fallbackExchange);
-  const index = await getDhanSymbolIndex();
+  const index = await getRegistrySymbolIndex();
   return index.get(`${exchange}:${query}`) ?? null;
 }
 

@@ -26,7 +26,7 @@ type Summary = {
 
 const STATUS_STYLES: Record<string, string> = {
   ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  TRIALING: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  TRIALING: "bg-sapphire-glow/10 text-sapphire-soft border-sapphire-glow/20",
   PAST_DUE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   CANCELED: "bg-rose-500/10 text-rose-400 border-rose-500/20"
 };

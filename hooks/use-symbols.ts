@@ -90,7 +90,7 @@ async function fetchSymbols(section: SectionId, options: UseSymbolsOptions): Pro
   if (existing) return existing;
 
   const promise = (async () => {
-    const res = await fetch(buildUrl(section, options), { cache: "no-store" });
+    const res = await fetch(buildUrl(section, options));
     if (!res.ok) {
       throw new Error(`/api/symbols ${res.status}`);
     }

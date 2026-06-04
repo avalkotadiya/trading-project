@@ -6,7 +6,7 @@ type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "kinetic-sheen bg-cyan-glow text-slate-950 shadow-[0_14px_36px_rgba(56,232,255,0.22)] hover:bg-cyan-soft focus-visible:ring-cyan-glow",
+    "kinetic-sheen bg-sapphire-core text-white shadow-[0_14px_36px_rgba(37,99,235,0.32)] hover:bg-sapphire-glow focus-visible:ring-sapphire-glow",
   secondary:
     "border border-white/10 bg-white/[0.08] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-cyan-glow/30 hover:bg-white/[0.12] focus-visible:ring-cyan-glow",
   ghost: "text-slate-300 hover:bg-white/[0.08] hover:text-white focus-visible:ring-cyan-glow",

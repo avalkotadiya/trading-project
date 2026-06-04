@@ -6,7 +6,6 @@ import { RecentAlerts } from "@/components/dashboard/recent-alerts";
 import { WatchlistPanel } from "@/components/dashboard/watchlist-panel";
 import { WalletCard } from "@/components/dashboard/wallet-card";
 import { AiTradingBot } from "@/components/dashboard/ai-trading-bot";
-import { DASHBOARD_SYMBOLS } from "@/lib/constants";
 import type { MarketTick } from "@/types/market";
 import type { AlertSummary, WatchlistSummary } from "@/types/platform";
 import type { SubscriptionState } from "@/types/subscription";
@@ -25,6 +24,7 @@ type DashboardClientProps = {
     }
   };
   token: string;
+  dashboardSymbols: string[];
 };
 
 export function DashboardClient({
@@ -32,7 +32,8 @@ export function DashboardClient({
   alerts,
   billingOverview,
   market,
-  token
+  token,
+  dashboardSymbols
 }: DashboardClientProps) {
   // Cards used to be gated by useDashboardSettings (localStorage flags), but
   // no UI ever exposed a toggle for those flags. The hook only persisted
@@ -47,7 +48,7 @@ export function DashboardClient({
         token={token}
         providerStatus={market.providerHealth.status}
         providerMessage={market.providerHealth.message}
-        fallbackSymbols={DASHBOARD_SYMBOLS}
+        fallbackSymbols={dashboardSymbols}
       />
 
       {/* AI Bot occupies the full dashboard row — the Edge list, KPI strip,

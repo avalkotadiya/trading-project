@@ -131,23 +131,26 @@ export class MarketDataService {
     if (this.provider.getSnapshots) {
       const cachedOrMissing: MarketSymbol[] = [];
       const ticks = new Map<string, NormalizedTick>();
+      const cachedTicks = await marketCacheService.getLatestTicks(symbols);
 
-      for (const symbol of symbols) {
-        const cached = await marketCacheService.getLatestTick(symbol);
+      symbols.forEach((symbol, index) => {
+        const cached = cachedTicks[index];
         if (cached) {
           ticks.set(getSubscriptionKey(symbol), cached);
         } else {
           cachedOrMissing.push(symbol);
         }
-      }
+      });
 
       if (cachedOrMissing.length > 0) {
         const snapshots = await this.provider.getSnapshots(cachedOrMissing);
         for (const snapshot of snapshots) {
           ticks.set(getSubscriptionKey(snapshot), snapshot);
-          await marketCacheService.setLatestTick(snapshot);
-          await marketCacheService.setSnapshot(snapshot);
         }
+        await Promise.all([
+          marketCacheService.setLatestTicks(snapshots),
+          marketCacheService.setSnapshots(snapshots)
+        ]);
       }
 
       return symbols.map((symbol) => ticks.get(getSubscriptionKey(symbol))).filter(Boolean) as NormalizedTick[];
@@ -174,6 +177,16 @@ export class MarketDataService {
       message: error instanceof Error ? error.message : "Health check failed.",
       circuitBreakerOpen: true
     }));
+    if (health.status === "error") {
+      const cached = await marketCacheService.getProviderHealth();
+      if (cached && cached.status !== "error") {
+        return {
+          ...cached,
+          checkedAt: health.checkedAt,
+          message: health.message ?? cached.message
+        };
+      }
+    }
     await marketCacheService.setProviderHealth(health);
     return health;
   }

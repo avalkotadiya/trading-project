@@ -1,14 +1,11 @@
+import { cacheGetOrSet } from "@/lib/cache";
 import { MARKET_CATEGORIES, type CategoryId } from "@/lib/market-categories";
 import {
   MAIN_SYMBOLS_PREFIX,
   compareByKnownPriority,
-  getCanonicalDisplayName,
-  getCanonicalDisplaySymbol,
-  isMainSymbolForCategory,
   normalizePrioritySymbol
 } from "@/lib/live-market-priority";
-import { getDhanInstrumentMaster, type DhanInstrumentSearchResult } from "@/services/dhan/dhanInstruments";
-import { normalizeDhanChartInstrument } from "@/services/dhan/dhanChartValidation";
+import { getSectionSymbols, type RegistrySymbol } from "@/services/symbols/symbol-registry";
 
 export type LiveMarketCategoryMeta = {
   id: CategoryId;
@@ -63,78 +60,55 @@ const SUPPORTED_SEGMENTS = new Set(
   MARKET_CATEGORIES.flatMap((category) => category.segments)
 );
 
-const DERIVATIVE_GRACE_MS = 24 * 60 * 60 * 1000;
 const UNIVERSE_TTL_MS = Math.max(
   60_000,
   Number(process.env.DHAN_LIVE_UNIVERSE_TTL_MS || "900000")
 );
+const UNIVERSE_CACHE_KEY = "market:live-universe:v2";
 
 let universeCache: UniverseIndexes | null = null;
 let universePromise: Promise<UniverseIndexes> | null = null;
 
-function parseDateMs(value?: string | null) {
-  if (!value) return null;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : null;
+function toInstrumentType(row: RegistrySymbol) {
+  return row.instrument.toUpperCase();
 }
 
-function toInstrumentType(row: DhanInstrumentSearchResult) {
-  return (row.exchInstrumentType || row.instrument || "").toUpperCase();
-}
-
-function isIndexRow(row: DhanInstrumentSearchResult) {
+function isIndexRow(row: RegistrySymbol) {
   const instType = toInstrumentType(row);
   const inst = row.instrument.toUpperCase();
   return row.exchangeSegment === "IDX_I" || instType === "IDX" || inst === "INDEX";
 }
 
-function isFutureRow(row: DhanInstrumentSearchResult) {
+function isFutureRow(row: RegistrySymbol) {
   const instType = toInstrumentType(row);
   const inst = row.instrument.toUpperCase();
   return instType.startsWith("FUT") || inst.startsWith("FUT");
 }
 
-function isOptionRow(row: DhanInstrumentSearchResult) {
+function isOptionRow(row: RegistrySymbol) {
   const instType = toInstrumentType(row);
   const inst = row.instrument.toUpperCase();
   return instType.startsWith("OPT") || inst.startsWith("OPT");
 }
 
-function isEtfRow(row: DhanInstrumentSearchResult) {
+function isEtfRow(row: RegistrySymbol) {
   const instType = toInstrumentType(row);
   const inst = row.instrument.toUpperCase();
   return instType === "ETF" || inst === "ETF";
 }
 
-function isExpiredDerivative(row: DhanInstrumentSearchResult) {
-  if (!isFutureRow(row) && !isOptionRow(row)) return false;
-  const expiryMs = parseDateMs(row.expiry);
-  if (expiryMs === null) return false;
-  return expiryMs < Date.now() - DERIVATIVE_GRACE_MS;
-}
-
-function toRequestCode(row: DhanInstrumentSearchResult): 15 | 17 | 21 {
+function toRequestCode(row: RegistrySymbol): 15 | 17 | 21 {
   // DhanHQ feed docs:
   // 15 = Ticker packet, 17 = Quote packet, 21 = Full packet.
   // We use 15 for index rows and 17 for all others to keep throughput high.
   return isIndexRow(row) ? 15 : 17;
 }
 
-function displayCategoryOf(row: DhanInstrumentSearchResult): CategoryId | null {
-  if (row.exchangeSegment === "MCX_COMM") return "commodity";
-  if (row.exchangeSegment === "NSE_CURRENCY" || row.exchangeSegment === "BSE_CURRENCY") return "currency";
-  if (isOptionRow(row)) return "options";
-  if (isFutureRow(row)) return "futures";
-  if (isIndexRow(row)) return "indices";
-  return null;
+function normalizeSymbol(row: RegistrySymbol) {
+  return row.symbol.replace(/\s+/g, "").toUpperCase();
 }
 
-function normalizeSymbol(row: DhanInstrumentSearchResult) {
-  const base = row.symbol || row.tradingSymbol || row.name || "";
-  return base.replace(/\s+/g, "").toUpperCase();
-}
-
-function toCategoryIds(row: DhanInstrumentSearchResult): CategoryId[] {
+function toCategoryIds(row: RegistrySymbol): CategoryId[] {
   const categories: CategoryId[] = ["all"];
   if (isIndexRow(row)) categories.push("indices");
   if (row.exchangeSegment === "NSE_EQ") categories.push("nse-eq");
@@ -149,57 +123,33 @@ function toCategoryIds(row: DhanInstrumentSearchResult): CategoryId[] {
   return Array.from(new Set(categories));
 }
 
-function buildRow(row: DhanInstrumentSearchResult): LiveMarketCategoryRow {
-  const rawSymbol = normalizeSymbol(row);
-  const displayCategory = displayCategoryOf(row);
-
-  // Display rule:
-  //   - Indices: keep each variant distinct ("NIFTY", "NIFTYBANK", "NIFTYIT", ...).
-  //     getCanonicalDisplaySymbol("indices", "NIFTYBANK") greedy-prefix-matches to
-  //     "NIFTY" and would make every Nifty-prefixed index render as "NIFTY".
-  //   - Options: append strike + side ("NIFTY 18500 CE") — trimContractRows keeps
-  //     one CE + one PE per base; if both displayed as just "NIFTY" the rows look
-  //     duplicated. Strike/side disambiguates them.
-  //   - ETFs: displayCategoryOf returns null for NSE_EQ/BSE_EQ so rawSymbol is
-  //     already used; no change needed.
-  //   - Futures/commodity/currency: canonical collapse + trimContractRows leaves
-  //     exactly one row per underlying, so the canonical name is fine.
-  let displaySymbol: string;
-  let displayName: string;
-
-  if (displayCategory === "options") {
-    const base = getCanonicalDisplaySymbol("options", rawSymbol);
-    const strike =
-      typeof row.strikePrice === "number" && Number.isFinite(row.strikePrice) && row.strikePrice > 0
-        ? String(Math.round(row.strikePrice))
-        : "";
-    const side = (row.optionType ?? "").toUpperCase()
-      .replace(/^CALL$/, "CE")
-      .replace(/^PUT$/, "PE");
-    displaySymbol = [base, strike, side].filter(Boolean).join(" ") || rawSymbol;
-    displayName = getCanonicalDisplayName("options", rawSymbol, row.name || row.tradingSymbol || rawSymbol);
-  } else if (displayCategory === "indices") {
-    displaySymbol = rawSymbol;
-    displayName = row.name || row.tradingSymbol || rawSymbol;
-  } else if (displayCategory) {
-    displaySymbol = getCanonicalDisplaySymbol(displayCategory, rawSymbol);
-    displayName = getCanonicalDisplayName(displayCategory, rawSymbol, row.name || row.tradingSymbol || rawSymbol);
-  } else {
-    displaySymbol = rawSymbol;
-    displayName = row.name || row.tradingSymbol || rawSymbol;
+function toDisplaySegment(row: RegistrySymbol) {
+  if (row.segmentLabel === "INDEX") return "INDEX";
+  if (
+    row.segmentLabel === "FUTURES" ||
+    row.segmentLabel === "OPTIONS" ||
+    row.segmentLabel === "COMMODITY" ||
+    row.segmentLabel === "CURRENCY" ||
+    row.exchangeSegment === "MCX_COMM" ||
+    row.exchangeSegment.endsWith("_CURRENCY")
+  ) {
+    return "FNO";
   }
+  return "EQ";
+}
 
+function buildRow(row: RegistrySymbol): LiveMarketCategoryRow {
   return {
-    symbol: displaySymbol,
+    symbol: normalizeSymbol(row),
     tradingSymbol: row.tradingSymbol,
-    name: displayName,
+    name: row.name,
     exchange: row.exchange,
-    segment: row.segment,
+    segment: toDisplaySegment(row),
     exchangeSegment: row.exchangeSegment,
     securityId: row.securityId,
     instrument: row.instrument.toUpperCase(),
     instrumentType: toInstrumentType(row),
-    chartInstrument: normalizeDhanChartInstrument(row.instrument, row.exchangeSegment),
+    chartInstrument: row.chartInstrument,
     requestCode: toRequestCode(row),
     isin: row.isin,
     lotSize: row.lotSize,
@@ -312,7 +262,7 @@ function trimContractRows(category: CategoryId, rows: LiveMarketCategoryRow[]) {
 }
 
 async function buildUniverse(): Promise<UniverseIndexes> {
-  const master = await getDhanInstrumentMaster();
+  const master = (await getSectionSymbols("all")).symbols;
   const byCategory: Record<CategoryId, LiveMarketCategoryRow[]> = {
     all: [],
     indices: [],
@@ -333,16 +283,13 @@ async function buildUniverse(): Promise<UniverseIndexes> {
   for (const row of master) {
     if (!SUPPORTED_SEGMENTS.has(row.exchangeSegment)) continue;
     if (!row.securityId || !row.tradingSymbol) continue;
-    if (isExpiredDerivative(row)) continue;
 
     const normalizedSymbol = normalizeSymbol(row);
     if (!normalizedSymbol) continue;
 
     const built = buildRow(row);
     const categories = toCategoryIds(row);
-    const mainCategories = categories
-      .filter((category) => category !== "all")
-      .filter((category) => isMainSymbolForCategory(category, built.symbol));
+    const mainCategories = categories.filter((category) => category !== "all");
     if (mainCategories.length === 0) continue;
     const dedupeKey = `${built.exchangeSegment}:${built.securityId}`;
 
@@ -389,7 +336,11 @@ async function getUniverseIndexes() {
   }
 
   if (!universePromise) {
-    universePromise = buildUniverse()
+    universePromise = cacheGetOrSet(
+      UNIVERSE_CACHE_KEY,
+      Math.ceil(UNIVERSE_TTL_MS / 1000),
+      buildUniverse
+    )
       .then((indexes) => {
         universeCache = indexes;
         return indexes;

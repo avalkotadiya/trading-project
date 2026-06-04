@@ -68,7 +68,7 @@ export function TopNav({ clerkEnabled, dashboard = false }: TopNavProps) {
           </span>
         </form>
         <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-2 rounded-full border border-cyan-glow/20 bg-cyan-glow/10 px-3 py-1.5 text-xs font-medium text-cyan-soft shadow-[0_0_28px_rgba(56,232,255,0.08)] sm:flex">
+          <div className="hidden items-center gap-2 rounded-full border border-cyan-glow/20 bg-cyan-glow/10 px-3 py-1.5 text-xs font-medium text-cyan-soft shadow-[0_0_28px_rgba(59,130,246,0.08)] sm:flex">
             <Sparkles className="h-3.5 w-3.5" />
             AI Signal Lab
           </div>

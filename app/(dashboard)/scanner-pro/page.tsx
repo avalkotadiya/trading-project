@@ -126,9 +126,9 @@ export default function ScannerProPage() {
   const isLive = connectionStatus === "live";
 
   return (
-    <div className="min-h-screen bg-[#030a15] pb-24 text-slate-200">
+    <div className="min-h-screen bg-[#050a16] pb-24 text-slate-200">
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#030a15]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#050a16]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Link
@@ -322,7 +322,7 @@ export default function ScannerProPage() {
             Bearish signal
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-            <Activity className="h-3 w-3 text-cyan-500" />
+            <Activity className="h-3 w-3 text-sapphire-glow" />
             Sgn% = (Signal Score − 50) · higher = stronger conviction
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500">

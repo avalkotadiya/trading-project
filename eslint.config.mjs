@@ -10,7 +10,15 @@ const eslintConfig = [
     }
   },
   {
-    ignores: [".next/**", "node_modules/**", "public/**", "next-env.d.ts"]
+    // Generated / vendored output is never hand-edited, so linting it only
+    // produces noise (the Prisma client ships minified `require()` bundles).
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "public/**",
+      "next-env.d.ts",
+      "lib/generated/**"
+    ]
   }
 ];
 

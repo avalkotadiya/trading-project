@@ -43,7 +43,7 @@ function Pill({
       className={cn(
         "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all whitespace-nowrap",
         active
-          ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300"
+          ? "border-sapphire-glow/50 bg-sapphire-glow/10 text-sapphire-soft"
           : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200"
       )}
     >
@@ -61,12 +61,12 @@ export function ScannerFilters({
       {/* Search + Sort row */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 transition-colors peer-focus:text-cyan-400" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 transition-colors peer-focus:text-sapphire-soft" />
           <input
             placeholder="Search symbol..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="peer h-9 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-3 text-xs text-white placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all"
+            className="peer h-9 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-3 text-xs text-white placeholder:text-slate-600 focus:border-sapphire-glow/40 focus:outline-none focus:ring-1 focus:ring-sapphire-glow/30 transition-all"
           />
         </div>
 
@@ -76,7 +76,7 @@ export function ScannerFilters({
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value)}
             aria-label="Sort by"
-            className="h-9 appearance-none rounded-xl border border-white/[0.08] bg-white/[0.03] pl-7 pr-6 text-xs text-slate-300 focus:border-cyan-500/40 focus:outline-none transition-all"
+            className="h-9 appearance-none rounded-xl border border-white/[0.08] bg-white/[0.03] pl-7 pr-6 text-xs text-slate-300 focus:border-sapphire-glow/40 focus:outline-none transition-all"
           >
             {SORTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>

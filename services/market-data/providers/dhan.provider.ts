@@ -67,7 +67,7 @@ export class DhanDataProvider implements MarketDataProvider {
     }
 
     if (instruments.length > 0) {
-      await dhanMarketFeedService.subscribe(instruments, 17);
+      await dhanMarketFeedService.subscribe(instruments, 17, { lane: "interactive" });
     }
   }
 

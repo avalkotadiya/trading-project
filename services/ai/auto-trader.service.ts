@@ -11,6 +11,9 @@ import {
   computeAutoTunedGates,
   type AutoTunedGates
 } from "@/services/ai/bot-auto-config";
+import { getScannerAlpha, scannerVerdict } from "@/services/ai/scanner-strategy.service";
+import { computeBotRecommendation } from "@/services/ai/bot-recommendation.service";
+import type { ScannerAlpha } from "@/types/bot";
 import { DASHBOARD_SYMBOLS } from "@/lib/constants";
 import { getSector } from "@/lib/sector-map";
 import type {
@@ -20,7 +23,9 @@ import type {
   BotGuardrail,
   BotKpis,
   BotPosition,
+  BotRecommendation,
   BotRunResult,
+  BotScannerSummary,
   BotState,
   BotTradeMode
 } from "@/types/bot";
@@ -635,9 +640,22 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
       sig: EdgeSignal;
       price: number;
       kellyFrac: number;
+      scannerBoost: number;
+      scannerScore: number | null;
     };
 
+    // Live Scanner-Pro confluence — the second alpha source. The bot only
+    // deploys when the historical quant edge AND the live tape agree. Failure
+    // here is non-fatal: an empty map means "no opinion" (boost 1.0).
+    const { alpha: scannerAlpha } = await getScannerAlpha().catch((error) => {
+      logger.warn(
+        `[AutoTrader] scanner alpha unavailable: ${error instanceof Error ? error.message : "unknown"}`
+      );
+      return { alpha: new Map<string, ScannerAlpha>() };
+    });
+
     const quantApproved: EntryPlan[] = [];
+    let scannerBlocked = 0;
     const recentCooldownSymbols = new Set(
       (
         await prisma.order.findMany({
@@ -662,12 +680,35 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
       const riskPerShare = price - stop;
       if (riskPerShare <= 0) continue;
 
+      // Scanner-confluence gate: optionally skip names the live tape reads as
+      // actively bearish; always carry the boost forward into sizing/ranking.
+      const verdict = scannerVerdict(sig.symbol, scannerAlpha);
+      if (verdict.block) {
+        scannerBlocked += 1;
+        await logEvent(
+          userId,
+          "INFO",
+          `Scanner confluence blocked ${sig.symbol} — ${verdict.label}.`,
+          sig.symbol
+        );
+        continue;
+      }
+
       quantApproved.push({
         sig: { ...sig, stopPrice: stop },
         price,
-        kellyFrac: Math.min(sig.kelly, gates.botKellyCap)
+        kellyFrac: Math.min(sig.kelly, gates.botKellyCap),
+        scannerBoost: verdict.boost,
+        scannerScore: verdict.score
       });
     }
+
+    // Pre-rank by quant quality weighted by live scanner confluence so the best
+    // "edge + tape agree" names get first claim on the open slots even before
+    // the AI advisory re-sorts by conviction.
+    quantApproved.sort(
+      (a, b) => b.sig.compositeScore * b.scannerBoost - a.sig.compositeScore * a.scannerBoost
+    );
 
     let plans = quantApproved;
     const convictionBySymbol = new Map<string, number>();
@@ -700,7 +741,11 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
             );
           }
         }
-        confirmed.sort((a, b) => b.conviction - a.conviction);
+        // Rank by AI conviction weighted by live scanner confluence so names
+        // confirmed by both the model and the tape lead the queue.
+        confirmed.sort(
+          (a, b) => b.conviction * b.plan.scannerBoost - a.conviction * a.plan.scannerBoost
+        );
         plans = confirmed.map((c) => c.plan);
         if (confirmed.length > 0) {
           await logEvent(
@@ -751,10 +796,13 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
 
       const composite = Math.max(0, Math.min(1, plan.sig.compositeScore / 100));
       const convictionRaw = convictionBySymbol.get(plan.sig.symbol);
-      const quality =
+      const baseQuality =
         convictionRaw !== undefined
           ? composite * Math.max(0, Math.min(1, convictionRaw / 100))
           : composite;
+      // Live scanner confluence scales the stake up to 1.3× on strong tape and
+      // down to 0.7× on weak tape, clamped back into the [0,1] quality band.
+      const quality = Math.max(0, Math.min(1, baseQuality * plan.scannerBoost));
       const sizingFactor = Math.sqrt(Math.max(0, quality));
       const evenSplit = capHeadroom / Math.max(1, slotsLeft);
       const targetStake = evenSplit * sizingFactor;
@@ -783,7 +831,7 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
         await logEvent(
           userId,
           "TRADE",
-          `${effectiveMode(user)} BUY ${quantity} ${plan.sig.symbol} @ Rs ${plan.price.toFixed(2)} | Rs ${stake.toFixed(0)} stake | score ${plan.sig.compositeScore}/100 | edge ${plan.sig.edgePct.toFixed(2)}% | win ${plan.sig.winProb.toFixed(0)}% | ${plan.sig.payoff}R | Kelly ${(plan.kellyFrac * 100).toFixed(1)}%${conviction !== undefined ? ` | AI ${conviction}/100` : ""}`,
+          `${effectiveMode(user)} BUY ${quantity} ${plan.sig.symbol} @ Rs ${plan.price.toFixed(2)} | Rs ${stake.toFixed(0)} stake | score ${plan.sig.compositeScore}/100 | edge ${plan.sig.edgePct.toFixed(2)}% | win ${plan.sig.winProb.toFixed(0)}% | ${plan.sig.payoff}R | Kelly ${(plan.kellyFrac * 100).toFixed(1)}%${conviction !== undefined ? ` | AI ${conviction}/100` : ""}${plan.scannerScore !== null ? ` | scanner ${plan.scannerScore.toFixed(0)}/100` : ""}`,
           plan.sig.symbol,
           {
             edgePct: plan.sig.edgePct,
@@ -799,7 +847,9 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
             sector: symbolSector,
             price: plan.price,
             stop: plan.sig.stopPrice,
-            conviction: conviction ?? null
+            conviction: conviction ?? null,
+            scannerScore: plan.scannerScore,
+            scannerBoost: plan.scannerBoost
           }
         );
       } catch (error) {
@@ -817,7 +867,7 @@ export async function runBotCycle(userId: string, request?: unknown): Promise<Bo
       await logEvent(
         userId,
         "INFO",
-        `Cycle: ${edges.length} stocks | ${inSetupCount} in uptrend | ${quantApproved.length} passed quant gates | 0 entries${exits > 0 ? ` | ${exits} exit${exits !== 1 ? "s" : ""}` : ""}`
+        `Cycle: ${edges.length} stocks | ${inSetupCount} in uptrend | ${quantApproved.length} passed quant gates${scannerBlocked > 0 ? ` | ${scannerBlocked} blocked by scanner` : ""} | 0 entries${exits > 0 ? ` | ${exits} exit${exits !== 1 ? "s" : ""}` : ""}`
       );
     }
 
@@ -902,11 +952,13 @@ export async function getBotState(
   };
 
   let candidates: BotCandidate[] = [];
+  let recoEdges: EdgeSignal[] = [];
   if (options.includeCandidates !== false) {
     try {
-      const edges = options.includeCandidates === "cache"
+      recoEdges = options.includeCandidates === "cache"
         ? (await getCachedEdgeSignals({ warmIfMissing: true })) ?? []
         : await getEdgeSignals();
+      const edges = recoEdges;
       const held = new Set(open.map((o) => o.symbol));
       candidates = edges.slice(0, 12).map((s) => {
         let eligible = true;
@@ -1001,6 +1053,26 @@ export async function getBotState(
     }
   ];
 
+  // Live scanner summary + AI-recommended settings. Non-fatal — the bot still
+  // works if either is unavailable; the UI just falls back to stored config.
+  let scanner: BotScannerSummary | null = null;
+  let recommendation: BotRecommendation | null = null;
+  try {
+    const { summary } = await getScannerAlpha();
+    scanner = summary;
+    const edgesForReco =
+      recoEdges.length > 0 ? recoEdges : (await getCachedEdgeSignals({ warmIfMissing: false })) ?? [];
+    recommendation = computeBotRecommendation({
+      walletBalance: Number(user.balance),
+      edges: edgesForReco,
+      scanner: summary
+    });
+  } catch (error) {
+    logger.warn(
+      `[AutoTrader] recommendation build failed: ${error instanceof Error ? error.message : "unknown"}`
+    );
+  }
+
   return {
     config,
     status: user.autoTradeEnabled ? "ACTIVE" : "PAUSED",
@@ -1009,7 +1081,9 @@ export async function getBotState(
     positions,
     candidates,
     events: await recentEvents(userId),
-    lastRunAt: user.botLastRunAt ? user.botLastRunAt.toISOString() : null
+    lastRunAt: user.botLastRunAt ? user.botLastRunAt.toISOString() : null,
+    recommendation,
+    scanner
   };
 }
 

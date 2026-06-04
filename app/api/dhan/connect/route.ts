@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 
 const connectSchema = z
   .object({
-    requestCode: z.union([z.literal(15), z.literal(17), z.literal(21)]).default(15),
+    requestCode: z.union([z.literal(15), z.literal(17), z.literal(19), z.literal(21)]).default(15),
+    lane: z.enum(["critical", "dashboard", "interactive", "bulk", "depth", "overflow"]).optional(),
     instruments: z.array(z.unknown()).optional()
   })
   .optional();
@@ -33,7 +34,9 @@ export async function POST(request: NextRequest) {
     );
 
     if (body.data?.instruments?.length) {
-      await dhanMarketFeedService.subscribe(body.data.instruments, body.data.requestCode);
+      await dhanMarketFeedService.subscribe(body.data.instruments, body.data.requestCode, {
+        lane: body.data.lane
+      });
     }
 
     const marketFeedStatus = dhanMarketFeedService.getStatus();

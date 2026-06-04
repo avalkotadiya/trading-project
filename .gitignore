@@ -2,6 +2,8 @@ node_modules
 .next
 out
 dist
+
+# Python / virtual environments
 .venv
 venv
 **/.venv
@@ -10,13 +12,17 @@ __pycache__
 **/__pycache__
 *.py[cod]
 
-# All .env files with real secrets - NEVER commit these
+# Environment files and secrets
 .env
 .env.local
 .env.*.local
 .env.vercel.*
+*.pem
+*.key
+*.p12
+*.pfx
 
-# Build and test artifacts
+# Build, logs, and test artifacts
 coverage
 playwright-report
 test-results
@@ -27,24 +33,18 @@ build_log.txt
 next.log
 serp_*.json
 
-# Database files
+# Database/generated/runtime files
 prisma/*.db
 lib/generated/prisma
 public/uploads
+data/runtime/
 
-# Vercel
+# Deployment/local tool state
 .vercel
+
+# Scratch files
+scratch/
 
 # OS metadata
 .DS_Store
 Thumbs.db
-
-# TLS / private key material - should never be in source control
-*.pem
-*.key
-*.p12
-*.pfx
-
-# Scratch and local scripts/artifacts
-scratch/
-data/runtime/

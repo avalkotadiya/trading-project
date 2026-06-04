@@ -87,6 +87,56 @@ export type BotEventDto = {
   createdAt: string;
 };
 
+// Live Scanner-Pro confluence read for a single symbol (see
+// services/ai/scanner-strategy.service.ts).
+export type ScannerAlpha = {
+  symbol: string;
+  sector: string;
+  signal: "bullish" | "bearish" | "neutral";
+  signalPercent: number; // 0-100 scanner conviction
+  rFactor: number;
+  relativeStrength: number; // 0-100 percentile vs scanned universe
+  relativeVolume: number; // x normal participation
+  moneyFlux: number; // -100..100 order-flow bias
+  score: number; // 0-100 blended confluence score
+};
+
+// Universe-level scanner summary surfaced to the bot UI.
+export type BotScannerSummary = {
+  breadth: number; // -100..100 (bullish - bearish) / total
+  avgRvol: number;
+  bullish: number;
+  bearish: number;
+  analyzed: number;
+  leaders: Array<{ symbol: string; score: number; signal: string }>;
+};
+
+// AI-recommended bot settings derived from wallet + edge + scanner data.
+// The user can accept these as-is or override any field.
+export type BotRecommendation = {
+  maxDeployedCapital: number;
+  botTrailStartPct: number;
+  botTrailDistancePct: number;
+  botMaxSectorExposurePct: number;
+  botEntryWindowStart: string | null;
+  botEntryWindowEnd: string | null;
+  basis: {
+    walletBalance: number;
+    candidatesAnalyzed: number;
+    medianAtrPct: number;
+    avgCompositeScore: number;
+    distinctSectors: number;
+    scannerBreadth: number;
+    deployFraction: number;
+  };
+  rationale: {
+    maxDeployedCapital: string;
+    trailing: string;
+    sectorCap: string;
+    entryWindow: string;
+  };
+};
+
 export type BotKpis = {
   realizedPnlToday: number;
   unrealizedPnl: number;
@@ -109,6 +159,10 @@ export type BotState = {
   candidates: BotCandidate[];
   events: BotEventDto[];
   lastRunAt: string | null;
+  // AI-recommended settings (data-driven defaults the user can accept/override).
+  recommendation: BotRecommendation | null;
+  // Live Scanner-Pro confluence summary feeding the bot's entry algorithm.
+  scanner: BotScannerSummary | null;
 };
 
 export type BotRunResult = {

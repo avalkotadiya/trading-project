@@ -67,8 +67,10 @@ export async function getMarketSnapshot(symbols?: string[]) {
   const key = `market:snapshot:${selectedSymbols.join(",")}`;
 
   return cacheGetOrSet(key, 3, async () => {
-    const providerTicks = await marketDataService.getTicks(selectedSymbols);
-    const providerHealth = await marketDataService.healthCheck();
+    const [providerTicks, providerHealth] = await Promise.all([
+      marketDataService.getTicks(selectedSymbols),
+      marketDataService.healthCheck()
+    ]);
     const ticks = providerTicks.map(toMarketTick);
 
     return {

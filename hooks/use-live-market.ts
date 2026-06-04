@@ -827,13 +827,13 @@ export function useLiveMarket(initialTicks: MarketTick[], token?: string, fallba
       void fetch("/api/dhan/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestCode: 15, instruments: AUTO_SUBSCRIBE_INDICES })
+        body: JSON.stringify({ requestCode: 15, lane: "critical", instruments: AUTO_SUBSCRIBE_INDICES })
       }).catch(() => { dhanConnectInitialized = false; });
 
       void fetch("/api/dhan/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestCode: 17, instruments: AUTO_SUBSCRIBE_EQUITIES })
+        body: JSON.stringify({ requestCode: 17, lane: "dashboard", instruments: AUTO_SUBSCRIBE_EQUITIES })
       }).catch(() => { dhanConnectInitialized = false; });
     }
 

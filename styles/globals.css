@@ -16,10 +16,10 @@ body {
   position: relative;
   min-height: 100vh;
   background:
-    linear-gradient(135deg, rgba(56, 232, 255, 0.1), transparent 28%),
-    linear-gradient(215deg, rgba(43, 240, 160, 0.08), transparent 34%),
-    linear-gradient(315deg, rgba(245, 185, 77, 0.06), transparent 38%),
-    #030711;
+    radial-gradient(1200px 620px at 12% -12%, rgba(37, 99, 235, 0.13), transparent 60%),
+    linear-gradient(215deg, rgba(30, 64, 175, 0.1), transparent 44%),
+    linear-gradient(315deg, rgba(59, 130, 246, 0.05), transparent 40%),
+    #050a16;
   color: rgb(var(--foreground));
   font-feature-settings:
     "cv02",
@@ -33,10 +33,10 @@ body.light {
   --background: 248 250 252;
   --foreground: 15 23 42;
   background:
-    linear-gradient(135deg, rgba(56, 232, 255, 0.18), transparent 30%),
-    linear-gradient(220deg, rgba(43, 240, 160, 0.14), transparent 34%),
-    linear-gradient(315deg, rgba(245, 185, 77, 0.1), transparent 40%),
-    #f8fafc;
+    linear-gradient(135deg, rgba(59, 130, 246, 0.16), transparent 32%),
+    linear-gradient(220deg, rgba(37, 99, 235, 0.1), transparent 36%),
+    linear-gradient(315deg, rgba(122, 162, 255, 0.1), transparent 42%),
+    #f1f5fc;
 }
 
 * {
@@ -44,20 +44,21 @@ body.light {
 }
 
 ::selection {
-  background: rgba(56, 232, 255, 0.35);
+  background: rgba(59, 130, 246, 0.35);
   color: white;
 }
 
 .glass-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(96, 131, 196, 0.18);
   background:
-    linear-gradient(145deg, rgba(17, 27, 49, 0.9), rgba(4, 9, 22, 0.78)),
-    rgba(7, 17, 31, 0.72);
+    linear-gradient(150deg, rgba(20, 34, 62, 0.92), rgba(7, 13, 28, 0.84)),
+    rgba(9, 16, 32, 0.74);
   box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 24px 70px rgba(2, 6, 18, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 }
@@ -68,9 +69,9 @@ body.light {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 18%),
-    linear-gradient(90deg, rgba(56, 232, 255, 0.08), transparent 42%, rgba(43, 240, 160, 0.06));
-  opacity: 0.7;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 18%),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.07), transparent 44%, rgba(37, 99, 235, 0.05));
+  opacity: 0.6;
 }
 
 .glass-panel > * {
@@ -97,9 +98,10 @@ body.light {
   position: absolute;
   inset: -18% -10%;
   background-image:
-    linear-gradient(rgba(56, 232, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 232, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
   background-size: 52px 52px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 16%, black 72%, transparent);
   mask-image: linear-gradient(to bottom, transparent, black 16%, black 72%, transparent);
   transform: rotateX(62deg) translateY(-11%);
   transform-origin: top center;
@@ -118,14 +120,14 @@ body.light {
 }
 
 .ambient-beam-a {
-  background: linear-gradient(90deg, transparent, rgba(56, 232, 255, 0.22), rgba(43, 240, 160, 0.13), transparent);
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.18), rgba(122, 162, 255, 0.1), transparent);
   transform: translateX(-64%) rotate(-16deg);
   animation: beamSweep 11s ease-in-out infinite alternate;
 }
 
 .ambient-beam-b {
   top: 42%;
-  background: linear-gradient(90deg, transparent, rgba(245, 185, 77, 0.1), rgba(255, 84, 112, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.1), rgba(122, 162, 255, 0.08), transparent);
   transform: translateX(-28%) rotate(18deg);
   animation: beamSweep 14s ease-in-out infinite alternate-reverse;
 }
@@ -146,10 +148,11 @@ body.light {
   height: 12rem;
   opacity: 0.24;
   background:
-    linear-gradient(90deg, transparent, rgba(56, 232, 255, 0.18), transparent),
-    repeating-linear-gradient(90deg, transparent 0 34px, rgba(43, 240, 160, 0.38) 34px 35px, transparent 35px 74px);
+    linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.18), transparent),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(59, 130, 246, 0.32) 34px 35px, transparent 35px 74px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
   mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
-  filter: drop-shadow(0 0 24px rgba(56, 232, 255, 0.18));
+  filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.18));
   transform: rotate(-8deg);
   animation: dataLane 12s linear infinite;
 }
@@ -170,9 +173,10 @@ body.light {
   position: absolute;
   inset: -20%;
   background-image:
-    linear-gradient(rgba(56, 232, 255, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 232, 255, 0.09) 1px, transparent 1px);
+    linear-gradient(rgba(59, 130, 246, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.09) 1px, transparent 1px);
   background-size: 42px 42px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 0 48%, transparent 78%);
   mask-image: radial-gradient(ellipse at center, black 0 48%, transparent 78%);
   transform: rotateX(58deg);
   animation: gridDrift 10s linear infinite;
@@ -181,8 +185,107 @@ body.light {
 .boot-scan {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 0 34%, rgba(56, 232, 255, 0.12), transparent 58% 100%);
+  background: linear-gradient(180deg, transparent 0 34%, rgba(59, 130, 246, 0.12), transparent 58% 100%);
   animation: scan 1.9s linear infinite;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Sapphire matte system — "matte blue 3D luxurious".
+   Deep royal-blue panels with layered elevation + crisp beveled rims and a
+   soft (non-neon) glow. Used by the AI Quant Bot and rolled out app-wide.
+   ─────────────────────────────────────────────────────────────────────────── */
+.matte-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(96, 131, 196, 0.18);
+  border-radius: 1rem;
+  background:
+    linear-gradient(160deg, rgba(22, 38, 70, 0.92), rgba(9, 16, 32, 0.97));
+  box-shadow:
+    0 18px 48px rgba(2, 6, 18, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.matte-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(150deg, rgba(122, 162, 255, 0.08), transparent 36%);
+  opacity: 0.7;
+}
+
+.matte-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Recessed sub-surface — for inputs, stat tiles, table wells inside a panel. */
+.matte-inset {
+  border: 1px solid rgba(96, 131, 196, 0.12);
+  border-radius: 0.75rem;
+  background: linear-gradient(165deg, rgba(13, 23, 44, 0.92), rgba(7, 13, 26, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Raised tactile element — for primary action chips / KPI medallions. */
+.matte-raise {
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  border-radius: 0.75rem;
+  background: linear-gradient(165deg, rgba(30, 49, 88, 0.95), rgba(12, 22, 44, 0.97));
+  box-shadow:
+    0 12px 28px rgba(2, 6, 18, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.matte-card {
+  transform-style: preserve-3d;
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 280ms ease,
+    box-shadow 280ms ease;
+}
+
+.matte-card:hover {
+  border-color: rgba(59, 130, 246, 0.36);
+  box-shadow:
+    0 28px 74px rgba(2, 6, 18, 0.62),
+    0 0 30px rgba(37, 99, 235, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transform: translateY(-2px);
+}
+
+.sapphire-title {
+  background: linear-gradient(95deg, #ffffff 0%, #bcd4ff 46%, #6f9bff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 20px 60px rgba(37, 99, 235, 0.18);
+}
+
+/* Soft animated rim used to signal a "live / active" matte panel. */
+.matte-active-rim {
+  position: relative;
+}
+
+.matte-active-rim::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(130deg, rgba(59, 130, 246, 0.55), rgba(122, 162, 255, 0.12), rgba(37, 99, 235, 0.45));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.65;
+  animation: pulseGlow 3.6s ease-in-out infinite;
 }
 
 .depth-card {
@@ -194,10 +297,10 @@ body.light {
 }
 
 .depth-card:hover {
-  border-color: rgba(56, 232, 255, 0.32);
+  border-color: rgba(59, 130, 246, 0.32);
   box-shadow:
     0 30px 90px rgba(0, 0, 0, 0.44),
-    0 0 42px rgba(56, 232, 255, 0.1),
+    0 0 42px rgba(59, 130, 246, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-3px) rotateX(1.2deg);
 }
@@ -213,21 +316,21 @@ body.light {
   inset: -1px;
   z-index: -1;
   border-radius: inherit;
-  background: linear-gradient(120deg, rgba(56, 232, 255, 0.55), rgba(43, 240, 160, 0.18), rgba(245, 185, 77, 0.3), rgba(56, 232, 255, 0.24));
+  background: linear-gradient(120deg, rgba(59, 130, 246, 0.45), rgba(122, 162, 255, 0.16), rgba(37, 99, 235, 0.36), rgba(59, 130, 246, 0.2));
   opacity: 0;
   transition: opacity 220ms ease;
 }
 
 .holo-edge:hover::after {
-  opacity: 0.55;
+  opacity: 0.42;
 }
 
 .cinematic-title {
-  background: linear-gradient(92deg, #ffffff 0%, #9cf7ff 38%, #d8fff0 64%, #f8d98a 100%);
+  background: linear-gradient(95deg, #ffffff 0%, #bcd4ff 46%, #6f9bff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  text-shadow: 0 28px 80px rgba(56, 232, 255, 0.16);
+  text-shadow: 0 28px 80px rgba(59, 130, 246, 0.16);
 }
 
 .kinetic-sheen {
@@ -312,7 +415,7 @@ body.light input::placeholder {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent, rgba(56, 232, 255, 0.2), transparent);
+  background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.2), transparent);
   animation: scan 4s linear infinite;
 }
 
@@ -340,8 +443,8 @@ body.light input::placeholder {
   body {
     width: 210mm;
     background: #020713 !important;
-    print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .brochure-page {
@@ -368,8 +471,8 @@ body.light input::placeholder {
 }
 
 .premium-progress::-webkit-progress-value {
-  background-color: #06b6d4; /* cyan-500 */
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+  background-color: #3b82f6; /* sapphire */
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.45);
   border-radius: 9999px;
   transition: width 0.5s ease-out;
 }
@@ -382,7 +485,7 @@ body.light input::placeholder {
 }
 
 .premium-progress::-moz-progress-bar {
-  background-color: #06b6d4;
+  background-color: #3b82f6;
   border-radius: 9999px;
 }
 

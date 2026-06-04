@@ -76,6 +76,28 @@ export default async function AdminPage() {
           ? "Dhan access token has expired — refresh it."
           : null);
 
+  const feedCapacity = Math.max(1, feed.maxLiveFeedInstruments ?? 1);
+  const feedUsagePercent = Math.min(100, Math.round((feed.totalSubscribed / feedCapacity) * 100));
+  const laneLabels: Record<string, string> = {
+    critical: "Critical indices",
+    dashboard: "Dashboard visible",
+    interactive: "User search/actions",
+    bulk: "Background universe",
+    depth: "Depth/full feed",
+    overflow: "Overflow"
+  };
+  const laneDescriptions: Record<string, string> = {
+    critical: "Fast ticker lane for indices and market heartbeat symbols.",
+    dashboard: "Quote lane for dashboard rows and curated equities.",
+    interactive: "On-demand symbols added by users and provider reads.",
+    bulk: "Large segment subscriptions and background coverage.",
+    depth: "Depth/full packets for request codes 19 and 21.",
+    overflow: "Fallback when a preferred lane is full."
+  };
+  const perConnection = feed.perConnection ?? [];
+  const activeLanes = Array.from(new Set(perConnection.map((connection) => connection.lane)));
+  const laneStatus = feed.laneStatus ?? [];
+
   const stats = [
     { label: "Users", value: users, icon: UsersRound, href: "/admin/users" },
     { label: "Active Subs", value: activeSubs, icon: ReceiptText, href: "/admin/subscriptions" },
@@ -134,11 +156,41 @@ export default async function AdminPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">WebSocket connections</span>
-              <span className="text-white">{feed.connections}</span>
+              <span className="text-white">
+                {feed.connections} / {feed.maxConnections ?? 5}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Instruments subscribed</span>
-              <span className="text-white">{feed.totalSubscribed}</span>
+              <span className="text-white">
+                {feed.totalSubscribed.toLocaleString("en-IN")} / {feedCapacity.toLocaleString("en-IN")}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Feed capacity used</span>
+                <span className="font-mono text-slate-300">{feedUsagePercent}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-sapphire-soft"
+                  style={{ width: `${feedUsagePercent}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Per connection cap</span>
+              <span className="text-white">{(feed.instrumentsPerConnection ?? 5000).toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Active lanes</span>
+              <span className="text-white">{activeLanes.length || 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Lane verifier</span>
+              <span className={feed.lanePrewarmActive ? "text-sapphire-soft" : "text-slate-400"}>
+                {feed.lanePrewarmActive ? "Running" : "Idle"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">DHAN_CLIENT_ID</span>
@@ -166,6 +218,105 @@ export default async function AdminPage() {
                 Feed is live and streaming.
               </p>
             )}
+
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Socket lane plan</p>
+              <div className="grid gap-2">
+                {laneStatus.map((status) => {
+                  const lane = status.lane;
+                  const connected = status.connected > 0;
+                  const hasConnection = status.connections > 0;
+                  const isThrottled = Boolean(status.lastError?.includes("429"));
+                  const tone = connected
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : isThrottled
+                      ? "bg-amber-500/10 text-amber-300"
+                      : hasConnection
+                        ? "bg-sapphire-glow/10 text-sapphire-soft"
+                        : "bg-slate-500/10 text-slate-400";
+                  const label = connected
+                    ? "Live"
+                    : isThrottled
+                      ? "Throttled"
+                      : hasConnection
+                        ? "Verifying"
+                        : "Planned";
+                  return (
+                    <div key={lane} className="rounded-md border border-white/10 bg-white/[0.035] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-white">{laneLabels[lane] ?? lane}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">{laneDescriptions[lane] ?? "Reserved feed lane."}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone}`}>
+                          {label} · {status.connections}/{status.target}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400">
+                        {status.subscribed.toLocaleString("en-IN")} subscribed
+                        {status.remaining ? ` · ${status.remaining.toLocaleString("en-IN")} free` : ""}
+                      </p>
+                      {status.nextRetryAt ? (
+                        <p className="mt-1 text-[11px] text-amber-300">
+                          Retry at {new Date(status.nextRetryAt).toLocaleTimeString("en-IN")}
+                        </p>
+                      ) : null}
+                      {status.lastError ? (
+                        <p className="mt-2 rounded border border-amber-500/20 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+                          {status.lastError}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live sockets</p>
+              {perConnection.length === 0 ? (
+                <div className="rounded-md border border-dashed border-white/10 bg-white/[0.02] p-3 text-xs text-slate-500">
+                  No market feed socket is active yet.
+                </div>
+              ) : null}
+              {perConnection.map((connection) => {
+                const usedPercent = Math.min(100, Math.round((connection.subscribed / Math.max(1, connection.capacity)) * 100));
+                return (
+                  <div key={connection.id} className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-white">
+                          Socket {connection.id} · {laneLabels[connection.lane] ?? connection.lane}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          {connection.subscribed.toLocaleString("en-IN")} used · {connection.remaining.toLocaleString("en-IN")} free
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${connection.connected ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                        {connection.connected ? "Live" : "Retrying"}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className="h-full rounded-full bg-sapphire-soft"
+                        style={{ width: `${usedPercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 grid gap-1 text-[11px] text-slate-500 sm:grid-cols-2">
+                      <span>Reconnects: {connection.reconnectAttempt}</span>
+                      <span>
+                        Next retry: {connection.nextRetryAt ? new Date(connection.nextRetryAt).toLocaleTimeString("en-IN") : "none"}
+                      </span>
+                    </div>
+                    {connection.lastError ? (
+                      <p className="mt-2 rounded border border-amber-500/20 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+                        {connection.lastError}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 

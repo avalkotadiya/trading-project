@@ -17,9 +17,23 @@ const config: Config = {
         panel: "#07111f",
         panelLight: "#0b1728",
         borderSoft: "rgba(148, 163, 184, 0.18)",
+        // The legacy `cyan` accent tokens now resolve to the sapphire-matte
+        // palette so the ~95 existing `cyan-glow`/`cyan-soft` usages across
+        // every page render as deep royal blue without per-page edits. Prefer
+        // the `sapphire.*` names in new code.
         cyan: {
-          glow: "#38e8ff",
-          soft: "#67e8f9"
+          glow: "#3b82f6",
+          soft: "#7aa2ff"
+        },
+        // Sapphire matte accent system — deep royal blue, low-gloss. Drives the
+        // "matte blue 3D luxurious" theme app-wide.
+        sapphire: {
+          soft: "#7aa2ff",
+          glow: "#3b82f6",
+          core: "#2563eb",
+          deep: "#1e40af",
+          night: "#162a52",
+          ink: "#0a1120"
         },
         trade: {
           green: "#2bf0a0",
@@ -28,12 +42,18 @@ const config: Config = {
         }
       },
       boxShadow: {
-        glow: "0 0 34px rgba(56, 232, 255, 0.2)",
-        panel: "0 18px 70px rgba(0, 0, 0, 0.35)"
+        // Softer, matte glow (was bright cyan neon).
+        glow: "0 0 30px rgba(59, 130, 246, 0.16)",
+        panel: "0 18px 70px rgba(0, 0, 0, 0.35)",
+        // Matte = soft, deep, low-glow elevation + crisp bevel rims.
+        matte: "0 18px 48px rgba(2, 6, 18, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.45)",
+        "matte-raise": "0 28px 74px rgba(2, 6, 18, 0.62), 0 0 30px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.07)",
+        bevel: "inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -2px 6px rgba(0, 0, 0, 0.4)",
+        "sapphire-glow": "0 0 26px rgba(37, 99, 235, 0.2)"
       },
       backgroundImage: {
         "market-grid":
-          "linear-gradient(rgba(56,232,255,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(56,232,255,0.07) 1px, transparent 1px)"
+          "linear-gradient(rgba(59,130,246,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px)"
       },
       keyframes: {
         scan: {

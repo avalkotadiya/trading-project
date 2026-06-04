@@ -4,7 +4,7 @@
  * Subscribe one or more instruments to the Dhan live feed.
  *
  * Body:
- *   requestCode  15 | 17 | 21   Feed mode (15=index/ticker, 17=quote+OHLCV, 21=full depth)
+ *   requestCode  15 | 17 | 19 | 21   Feed mode (15=index/ticker, 17=quote+OHLCV, 19=5-depth, 21=full)
  *   instruments  array           [{ExchangeSegment, SecurityId}, ...]
  *   meta         array?          Optional symbol metadata to register in the server-side
  *                                symbol registry so SSE packets carry human-readable
@@ -23,6 +23,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api-response";
 import { rateLimit } from "@/lib/rate-limit";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { DHAN_MAX_LIVE_FEED_INSTRUMENTS } from "@/lib/dhan-api-limits";
 import { dhanMarketFeedService } from "@/services/dhan/dhanMarketFeed";
 import { marketHistoryService } from "@/services/market-data/market-history.service";
 import type { MarketSymbol } from "@/services/market-data/market-data.types";
@@ -47,8 +48,9 @@ const symbolMetaSchema = z.object({
 });
 
 const subscribeSchema = z.object({
-  requestCode: z.union([z.literal(15), z.literal(17), z.literal(21)]).default(15),
-  instruments: z.array(z.unknown()).min(1).max(5000),
+  requestCode: z.union([z.literal(15), z.literal(17), z.literal(19), z.literal(21)]).default(15),
+  lane: z.enum(["critical", "dashboard", "interactive", "bulk", "depth", "overflow"]).optional(),
+  instruments: z.array(z.unknown()).min(1).max(DHAN_MAX_LIVE_FEED_INSTRUMENTS),
   /** Optional per-instrument metadata to register in the server-side symbol registry. */
   meta: z.array(symbolMetaSchema).optional()
 });
@@ -96,11 +98,14 @@ export async function POST(request: NextRequest) {
       marketHistoryService.ensureHistoryForSymbols(symbolsForBackfill);
     }
 
-    await dhanMarketFeedService.subscribe(parsed.data.instruments, parsed.data.requestCode);
+    await dhanMarketFeedService.subscribe(parsed.data.instruments, parsed.data.requestCode, {
+      lane: parsed.data.lane
+    });
 
     return ok({
       subscribed: parsed.data.instruments.length,
       requestCode: parsed.data.requestCode,
+      lane: parsed.data.lane ?? null,
       registered: parsed.data.meta?.length ?? 0
     });
   } catch (error) {
