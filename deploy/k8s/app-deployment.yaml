@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sahara-app
+  namespace: sahara-trade
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sahara-app
+  template:
+    metadata:
+      labels:
+        app: sahara-app
+    spec:
+      containers:
+        - name: app
+          image: sahara-trade-intelligence:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: sahara-config
+            - secretRef:
+                name: sahara-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sahara-app
+  namespace: sahara-trade
+spec:
+  selector:
+    app: sahara-app
+  ports:
+    - port: 80
+      targetPort: 3000

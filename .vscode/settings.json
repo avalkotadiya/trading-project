@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "f:/Data/WebDevelopment/Trading Project - Antigravity/ai-engine/venv/Scripts/python.exe",
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "git.path": "D:\\Git\\cmd\\git.exe",
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "ts",
+    "typescript": "ts"
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:system"
+}

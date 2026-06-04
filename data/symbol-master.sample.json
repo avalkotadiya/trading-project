@@ -1,0 +1,327 @@
+[
+  {
+    "exchange": "NSE",
+    "segment": "INDEX",
+    "symbol": "NIFTY",
+    "tradingSymbol": "NIFTY 50",
+    "instrumentToken": "NSE_INDEX_NIFTY50",
+    "isin": null,
+    "companyName": "Nifty 50",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "INDEX",
+    "symbol": "BANKNIFTY",
+    "tradingSymbol": "NIFTY BANK",
+    "instrumentToken": "NSE_INDEX_BANKNIFTY",
+    "isin": null,
+    "companyName": "Nifty Bank",
+    "lotSize": 1
+  },
+  {
+    "exchange": "BSE",
+    "segment": "INDEX",
+    "symbol": "SENSEX",
+    "tradingSymbol": "SENSEX",
+    "instrumentToken": "BSE_INDEX_SENSEX",
+    "bseScripCode": "1",
+    "isin": null,
+    "companyName": "BSE Sensex",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "RELIANCE",
+    "tradingSymbol": "RELIANCE",
+    "instrumentToken": "NSE_EQ_RELIANCE",
+    "isin": "INE002A01018",
+    "companyName": "Reliance Industries",
+    "lotSize": 1
+  },
+  {
+    "exchange": "BSE",
+    "segment": "EQ",
+    "symbol": "RELIANCE",
+    "tradingSymbol": "RELIANCE",
+    "instrumentToken": "BSE_EQ_500325",
+    "bseScripCode": "500325",
+    "isin": "INE002A01018",
+    "companyName": "Reliance Industries",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "TCS",
+    "tradingSymbol": "TCS",
+    "instrumentToken": "NSE_EQ_TCS",
+    "isin": "INE467B01029",
+    "companyName": "Tata Consultancy Services",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "INFY",
+    "tradingSymbol": "INFY",
+    "instrumentToken": "NSE_EQ_INFY",
+    "isin": "INE009A01021",
+    "companyName": "Infosys",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "HDFCBANK",
+    "tradingSymbol": "HDFCBANK",
+    "instrumentToken": "NSE_EQ_HDFCBANK",
+    "isin": "INE040A01034",
+    "companyName": "HDFC Bank",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "ICICIBANK",
+    "tradingSymbol": "ICICIBANK",
+    "instrumentToken": "NSE_EQ_ICICIBANK",
+    "isin": "INE090A01021",
+    "companyName": "ICICI Bank",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "SBIN",
+    "tradingSymbol": "SBIN",
+    "instrumentToken": "NSE_EQ_SBIN",
+    "isin": "INE062A01020",
+    "companyName": "State Bank of India",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "TITAN",
+    "tradingSymbol": "TITAN",
+    "instrumentToken": "NSE_EQ_TITAN",
+    "isin": "INE280A01028",
+    "companyName": "Titan Company",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "AXISBANK",
+    "tradingSymbol": "AXISBANK",
+    "instrumentToken": "NSE_EQ_AXISBANK",
+    "isin": "INE238A01034",
+    "companyName": "Axis Bank",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "KOTAKBANK",
+    "tradingSymbol": "KOTAKBANK",
+    "instrumentToken": "NSE_EQ_KOTAKBANK",
+    "isin": "INE237A01028",
+    "companyName": "Kotak Mahindra Bank",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "LT",
+    "tradingSymbol": "LT",
+    "instrumentToken": "NSE_EQ_LT",
+    "isin": "INE018A01030",
+    "companyName": "Larsen & Toubro",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "BAJFINANCE",
+    "tradingSymbol": "BAJFINANCE",
+    "instrumentToken": "NSE_EQ_BAJFINANCE",
+    "isin": "INE296A01024",
+    "companyName": "Bajaj Finance",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "MARUTI",
+    "tradingSymbol": "MARUTI",
+    "instrumentToken": "NSE_EQ_MARUTI",
+    "isin": "INE585B01010",
+    "companyName": "Maruti Suzuki India",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "SUNPHARMA",
+    "tradingSymbol": "SUNPHARMA",
+    "instrumentToken": "NSE_EQ_SUNPHARMA",
+    "isin": "INE044A01036",
+    "companyName": "Sun Pharmaceutical Industries",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "BHARTIARTL",
+    "tradingSymbol": "BHARTIARTL",
+    "instrumentToken": "NSE_EQ_BHARTIARTL",
+    "isin": "INE397D01024",
+    "companyName": "Bharti Airtel",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "WIPRO",
+    "tradingSymbol": "WIPRO",
+    "instrumentToken": "NSE_EQ_WIPRO",
+    "isin": "INE075A01022",
+    "companyName": "Wipro",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "HCLTECH",
+    "tradingSymbol": "HCLTECH",
+    "instrumentToken": "NSE_EQ_HCLTECH",
+    "isin": "INE860A01027",
+    "companyName": "HCL Technologies",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "TATAMOTORS",
+    "tradingSymbol": "TATAMOTORS",
+    "instrumentToken": "NSE_EQ_TATAMOTORS",
+    "isin": "INE155A01022",
+    "companyName": "Tata Motors",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "TATASTEEL",
+    "tradingSymbol": "TATASTEEL",
+    "instrumentToken": "NSE_EQ_TATASTEEL",
+    "isin": "INE081A01020",
+    "companyName": "Tata Steel",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "ITC",
+    "tradingSymbol": "ITC",
+    "instrumentToken": "NSE_EQ_ITC",
+    "isin": "INE154A01025",
+    "companyName": "ITC",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "BAJAJFINSV",
+    "tradingSymbol": "BAJAJFINSV",
+    "instrumentToken": "NSE_EQ_BAJAJFINSV",
+    "isin": "INE918I01026",
+    "companyName": "Bajaj Finserv",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "TECHM",
+    "tradingSymbol": "TECHM",
+    "instrumentToken": "NSE_EQ_TECHM",
+    "isin": "INE669C01036",
+    "companyName": "Tech Mahindra",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "ONGC",
+    "tradingSymbol": "ONGC",
+    "instrumentToken": "NSE_EQ_ONGC",
+    "isin": "INE213A01029",
+    "companyName": "Oil & Natural Gas Corporation",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "HINDALCO",
+    "tradingSymbol": "HINDALCO",
+    "instrumentToken": "NSE_EQ_HINDALCO",
+    "isin": "INE038A01020",
+    "companyName": "Hindalco Industries",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "JSWSTEEL",
+    "tradingSymbol": "JSWSTEEL",
+    "instrumentToken": "NSE_EQ_JSWSTEEL",
+    "isin": "INE019A01038",
+    "companyName": "JSW Steel",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "NESTLEIND",
+    "tradingSymbol": "NESTLEIND",
+    "instrumentToken": "NSE_EQ_NESTLEIND",
+    "isin": "INE239A01024",
+    "companyName": "Nestle India",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "DRREDDY",
+    "tradingSymbol": "DRREDDY",
+    "instrumentToken": "NSE_EQ_DRREDDY",
+    "isin": "INE089A01023",
+    "companyName": "Dr. Reddy's Laboratories",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "EQ",
+    "symbol": "POWERGRID",
+    "tradingSymbol": "POWERGRID",
+    "instrumentToken": "NSE_EQ_POWERGRID",
+    "isin": "INE752E01010",
+    "companyName": "Power Grid Corporation of India",
+    "lotSize": 1
+  },
+  {
+    "exchange": "NSE",
+    "segment": "FNO",
+    "symbol": "NIFTY26MAY24700CE",
+    "tradingSymbol": "NIFTY26MAY24700CE",
+    "instrumentToken": "NSE_FNO_NIFTY_2026-05-28_24700_CE",
+    "isin": null,
+    "companyName": "Nifty 50 Call Option",
+    "lotSize": 75,
+    "expiry": "2026-05-28",
+    "strikePrice": 24700,
+    "optionType": "CE"
+  }
+]

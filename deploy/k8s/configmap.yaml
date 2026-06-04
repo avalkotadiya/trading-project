@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sahara-config
+  namespace: sahara-trade
+data:
+  NEXT_PUBLIC_APP_URL: "https://sahara.example.com"
+  NEXT_PUBLIC_MARKET_WS_URL: "wss://market-data.sahara.example.com/ws"
+  MARKET_DATA_PROVIDER: "dhan"
+  MARKET_DATA_ALLOWED_SEGMENTS: "NSE_EQ,NSE_FNO,BSE_EQ,BSE_FNO"
+  PRISMA_CONNECTION_LIMIT: "3"
+  REALTIME_PORT: "3001"

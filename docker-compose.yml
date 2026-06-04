@@ -1,0 +1,73 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # Override host-facing values from .env with in-network service DNS names.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sahara_trade?schema=public
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_MARKET_WS_URL: ws://localhost:3001/ws
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  realtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.realtime
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      REALTIME_PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sahara_trade?schema=public
+      REDIS_URL: redis://redis:6379
+      MARKET_DATA_PROVIDER: dhan
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sahara_trade
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sahara_trade"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    external: true
+    name: tradingproject-antigravity-copy_postgres-data

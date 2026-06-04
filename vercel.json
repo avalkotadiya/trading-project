@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/bot/cron",
+      "schedule": "*/5 4-10 * * 1-5"
+    },
+    {
+      "path": "/api/admin/cleanup",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

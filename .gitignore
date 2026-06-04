@@ -1,0 +1,50 @@
+node_modules
+.next
+out
+dist
+.venv
+venv
+**/.venv
+**/venv
+__pycache__
+**/__pycache__
+*.py[cod]
+
+# All .env files with real secrets - NEVER commit these
+.env
+.env.local
+.env.*.local
+.env.vercel.*
+
+# Build and test artifacts
+coverage
+playwright-report
+test-results
+*.log
+.smoke.*
+tsconfig.tsbuildinfo
+build_log.txt
+next.log
+serp_*.json
+
+# Database files
+prisma/*.db
+lib/generated/prisma
+public/uploads
+
+# Vercel
+.vercel
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# TLS / private key material - should never be in source control
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Scratch and local scripts/artifacts
+scratch/
+data/runtime/

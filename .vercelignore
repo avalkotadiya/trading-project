@@ -1,0 +1,14 @@
+.env
+.env.local
+.env.*.local
+.next
+node_modules
+coverage
+deploy
+playwright-report
+test-results
+tests
+*.log
+.smoke.*
+tsconfig.tsbuildinfo
+public/uploads
