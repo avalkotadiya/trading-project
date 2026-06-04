@@ -80,8 +80,8 @@ export class MarketDataService {
   }
 
   async subscribe(inputs: string[]) {
-    const symbols = await this.resolveInputs(inputs);
-    await this.ensureAllowedSegments(symbols);
+    const symbols = this.filterAllowedSegments(await this.resolveInputs(inputs));
+    if (symbols.length === 0) return [];
     await this.connect();
     return this.subscriptionManager.subscribe(symbols);
   }
@@ -99,7 +99,11 @@ export class MarketDataService {
       throw new InvalidMarketSymbolError(input);
     }
 
-    await this.ensureAllowedSegments([symbol]);
+    if (this.filterAllowedSegments([symbol]).length === 0) {
+      throw new MarketProviderUnavailableError(
+        `${getSubscriptionKey(symbol)} is outside MARKET_DATA_ALLOWED_SEGMENTS.`
+      );
+    }
 
     const cached = await marketCacheService.getSnapshot(symbol);
 
@@ -118,8 +122,8 @@ export class MarketDataService {
   }
 
   async getTicks(inputs: string[]) {
-    const symbols = await this.resolveInputs(inputs);
-    await this.ensureAllowedSegments(symbols);
+    const symbols = this.filterAllowedSegments(await this.resolveInputs(inputs));
+    if (symbols.length === 0) return [];
     marketHistoryService.ensureHistoryForSymbols(symbols);
     // Connecting/subscribing the live feed is best-effort for reads: if the
     // WebSocket can't connect (token/clientId/network), we must still serve
@@ -240,14 +244,13 @@ export class MarketDataService {
     return Array.from(unique.values());
   }
 
-  private async ensureAllowedSegments(symbols: MarketSymbol[]) {
-    const blocked = symbols.find((symbol) => !this.config.allowedSegments.includes(getSegmentKey(symbol)));
-
-    if (blocked) {
-      throw new MarketProviderUnavailableError(
-        `${getSubscriptionKey(blocked)} is outside MARKET_DATA_ALLOWED_SEGMENTS.`
-      );
-    }
+  // Drop symbols in segments the deployment isn't licensed/configured for
+  // (MARKET_DATA_ALLOWED_SEGMENTS) instead of throwing for the whole batch.
+  // A single unsupported symbol (e.g. an MCX commodity in a mixed watchlist)
+  // must never fail the live feed for every other symbol in the request —
+  // mirrors how resolveInputs() silently skips unresolved symbols.
+  private filterAllowedSegments(symbols: MarketSymbol[]): MarketSymbol[] {
+    return symbols.filter((symbol) => this.config.allowedSegments.includes(getSegmentKey(symbol)));
   }
 
   private async writeHealth(message?: string) {

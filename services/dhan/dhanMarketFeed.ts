@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { logger } from "@/lib/logger";
 import { resolveDhanAccessToken } from "@/services/dhan/dhanAuth";
-import { decodeDhanFeedPacket } from "@/services/dhan/dhanBinaryDecoder";
+import { decodeDhanFeedPackets } from "@/services/dhan/dhanBinaryDecoder";
 import { marketHistoryService } from "@/services/market-data/market-history.service";
 import { DHAN_DASHBOARD_INSTRUMENTS } from "@/lib/dhan-symbols";
 import { DHAN_LIVE_FEED_LIMITS, DHAN_MAX_LIVE_FEED_INSTRUMENTS } from "@/lib/dhan-api-limits";
@@ -206,24 +206,26 @@ class FeedConnection {
 
     socket.on("message", (raw: import("ws").RawData) => {
       this.lastFeedActivityAt = Date.now();
-      const parsed = this.normalizePacket(raw);
-      if (!parsed) return;
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        "type" in parsed &&
-        (parsed as { type?: string }).type === "disconnect"
-      ) {
-        this.lastError = `Feed ${this.id} disconnected (code: ${(parsed as { reasonCode?: number }).reasonCode ?? "unknown"})`;
-        socket.close();
-        return;
+      // A single Dhan frame may carry several concatenated packets; decode all.
+      for (const parsed of this.normalizePackets(raw)) {
+        if (!parsed) continue;
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "type" in parsed &&
+          (parsed as { type?: string }).type === "disconnect"
+        ) {
+          this.lastError = `Feed ${this.id} disconnected (code: ${(parsed as { reasonCode?: number }).reasonCode ?? "unknown"})`;
+          socket.close();
+          return;
+        }
+        // Enrich the packet with symbol metadata from the server-side registry
+        // so SSE consumers don't need a client-side SecurityId → symbol map.
+        const enriched = this.enrichWithSymbol(parsed);
+        marketHistoryService.trackDhanPacket(enriched);
+        this.pushLatest(enriched);
+        this.emitTick(enriched);
       }
-      // Enrich the packet with symbol metadata from the server-side registry
-      // so SSE consumers don't need a client-side SecurityId → symbol map.
-      const enriched = this.enrichWithSymbol(parsed);
-      marketHistoryService.trackDhanPacket(enriched);
-      this.pushLatest(enriched);
-      this.emitTick(enriched);
     });
 
     socket.on("close", () => {
@@ -309,13 +311,14 @@ class FeedConnection {
     });
   }
 
-  private normalizePacket(raw: import("ws").RawData) {
+  private normalizePackets(raw: import("ws").RawData): unknown[] {
     if (typeof raw === "string") {
-      try { return JSON.parse(raw) as unknown; } catch { return { type: "dhan.text", payload: raw }; }
+      try { return [JSON.parse(raw) as unknown]; } catch { return [{ type: "dhan.text", payload: raw }]; }
     }
     const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
-    if (buf.length === 0) return null;
-    return { ...decodeDhanFeedPacket(buf), receivedAt: new Date().toISOString() };
+    if (buf.length === 0) return [];
+    const receivedAt = new Date().toISOString();
+    return decodeDhanFeedPackets(buf).map((packet) => ({ ...packet, receivedAt }));
   }
 
   /**
@@ -465,7 +468,6 @@ class DhanMarketFeedService {
 
   async connect() {
     await this.ensurePrimaryConnection();
-    this.scheduleLanePrewarm();
     void this.subscribeAutoConfiguredInstruments().catch((e) => {
       logger.warn("Auto-subscribe failed", { message: e instanceof Error ? e.message : String(e) });
     });
@@ -502,7 +504,6 @@ class DhanMarketFeedService {
 
   async ensureConnected() {
     await this.ensurePrimaryConnection();
-    this.scheduleLanePrewarm();
   }
 
   onTick(listener: TickListener) {
@@ -660,26 +661,23 @@ class DhanMarketFeedService {
   }
 
   private pickConnection(lane: FeedLane) {
-    const sameLane = this.connections
-      .filter((connection) => connection.lane === lane && connection.hasCapacity(1))
+    // Lane-agnostic packing. Dhan caps a user at 5 concurrent websockets, and
+    // each socket holds up to INSTRUMENTS_PER_CONNECTION (5000) instruments —
+    // far more than the dashboard needs. Eagerly opening one socket per "lane"
+    // pushed us to (or past) that 5-socket cap, which Dhan rejects with HTTP
+    // 429 on the handshake, stalling the whole feed. Instead, pack everything
+    // onto the fewest sockets possible: reuse the least-loaded connection with
+    // free capacity, and only spawn a new socket once they're all full.
+    const withCapacity = this.connections
+      .filter((connection) => connection.hasCapacity(1))
       .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0];
-    if (sameLane) return sameLane;
+    if (withCapacity) return withCapacity;
 
-    const canSpawnLane =
-      this.connections.length < MAX_CONCURRENT_CONNECTIONS &&
-      this.laneConnectionCount(lane) < LANE_TARGET_CONNECTIONS[lane];
-    if (canSpawnLane) return this.spawnConnection(lane);
-
-    if (lane !== "critical") {
-      const overflow = this.connections
-        .filter((connection) => connection.lane !== "critical" && connection.hasCapacity(1))
-        .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0];
-      if (overflow) return overflow;
+    if (this.connections.length < MAX_CONCURRENT_CONNECTIONS) {
+      return this.spawnConnection(lane);
     }
 
-    return this.connections
-      .filter((connection) => connection.hasCapacity(1))
-      .sort((left, right) => left.totalSubscribed() - right.totalSubscribed())[0] ?? null;
+    return null;
   }
 
   private async distribute(instruments: MarketInstrument[], requestCode: FeedRequestCode, lane: FeedLane) {

@@ -154,6 +154,59 @@ function parseFull(view: DataView, header: ReturnType<typeof readHeader>) {
   };
 }
 
+// Fixed on-wire byte length of each Dhan v2 feed packet, keyed by response
+// (feed) code. Used to walk a frame that concatenates several packets.
+//   1 = Index (16), 2 = Ticker (16), 4 = Quote (50), 5 = OI (12),
+//   6 = Prev Close (16), 8 = Full (162). 50 = Disconnect (variable, ends frame).
+const PACKET_SIZE_BY_CODE: Record<number, number> = {
+  1: 16,
+  2: 16,
+  4: 50,
+  5: 12,
+  6: 16,
+  8: 162
+};
+
+/**
+ * Decode a Dhan feed WebSocket frame into one OR MORE packets. The Dhan v2
+ * binary protocol may concatenate several response packets into a single WS
+ * message (each carries its own 8-byte header + Message Length), so decoding
+ * only the first packet — as the old single-packet path did — silently dropped
+ * every instrument after the first in a batched frame. This walks the buffer
+ * packet-by-packet using the known per-code sizes.
+ */
+export function decodeDhanFeedPackets(buf: Buffer): Array<ReturnType<typeof decodeDhanFeedPacket>> {
+  if (!buf || buf.byteLength < 8) {
+    return [decodeDhanFeedPacket(buf)];
+  }
+
+  const packets: Array<ReturnType<typeof decodeDhanFeedPacket>> = [];
+  let offset = 0;
+
+  while (offset + 8 <= buf.byteLength) {
+    const code = buf.readUInt8(offset);
+
+    // Disconnect ends the frame; decode the remainder and stop.
+    if (code === 50) {
+      packets.push(decodeDhanFeedPacket(buf.subarray(offset)));
+      break;
+    }
+
+    const size = PACKET_SIZE_BY_CODE[code];
+    if (!size || offset + size > buf.byteLength) {
+      // Unknown code or truncated tail — decode whatever remains once and stop
+      // rather than risk a misaligned read or an infinite loop.
+      packets.push(decodeDhanFeedPacket(buf.subarray(offset)));
+      break;
+    }
+
+    packets.push(decodeDhanFeedPacket(buf.subarray(offset, offset + size)));
+    offset += size;
+  }
+
+  return packets.length > 0 ? packets : [decodeDhanFeedPacket(buf)];
+}
+
 export function decodeDhanFeedPacket(buf: Buffer) {
   if (!buf || buf.byteLength < 8) {
     return { type: "unknown", reason: "short-packet" };

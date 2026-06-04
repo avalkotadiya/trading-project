@@ -351,6 +351,7 @@ export function AiTradingBot() {
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-black/40">
+            {/* eslint-disable-next-line no-inline-styles */}
             <div
               className={cn(
                 "h-full rounded-full transition-all",
